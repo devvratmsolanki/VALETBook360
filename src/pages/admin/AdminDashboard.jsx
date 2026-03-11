@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getTransactionStats } from '../../services/transactionService';
-import Card from '../../components/ui/Card';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { Car, Building2, Users, Activity, TrendingUp, Clock, CheckCircle, ArrowRight } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -25,7 +25,7 @@ const AdminDashboard = () => {
         { label: 'Users', icon: Users, href: '/admin/users', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
     ];
 
-    if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-2 border-brand-500 border-t-transparent rounded-full" /></div>;
+    if (loading) return <div className="flex items-center justify-center h-64"><LoadingSpinner size="lg" /></div>;
 
     return (
         <div className="animate-fade-in">

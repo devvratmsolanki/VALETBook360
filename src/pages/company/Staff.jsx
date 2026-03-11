@@ -5,6 +5,7 @@ import { getLocationsByCompany } from '../../services/locationService';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { toast } from '../../components/ui/Toast';
 import { Users as UsersIcon, MapPin, Shield, Mail, Trash2, Edit2, Check, X, Plus, Key } from 'lucide-react';
 
@@ -99,7 +100,7 @@ const Staff = () => {
         valet: 'bg-brand-500/10 text-brand-400 border-brand-500/20'
     }[r] || '');
 
-    if (loading) return <div className="flex justify-center py-12"><div className="animate-spin h-6 w-6 border-2 border-brand-500 border-t-transparent rounded-full" /></div>;
+    if (loading) return <div className="flex justify-center py-12"><LoadingSpinner size="md" /></div>;
 
     return (
         <div className="animate-fade-in">

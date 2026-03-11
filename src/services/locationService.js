@@ -6,23 +6,39 @@ export const getLocationsByCompany = async (companyId) => {
     return data || [];
 };
 
-export const getAllLocations = async () => {
+export const getLocations = async () => {
     const { data, error } = await supabase.from('locations').select('*, valet_companies:valet_company_id(company_name)').order('name');
     if (error) throw error;
     return data || [];
 };
 
-export const createLocation = async (location) => {
-    const { data, error } = await supabase.from('locations').insert({
-        ...location,
-        key_capacity: parseInt(location.key_capacity) || 0
-    }).select().single();
+export const createLocation = async (locationData) => {
+    const mappedData = {
+        valet_company_id: locationData.companyId || locationData.valet_company_id,
+        name: locationData.name,
+        address: locationData.address,
+        city: locationData.city,
+        state: locationData.state,
+        country: locationData.country,
+        key_capacity: locationData.keyCapacity || locationData.key_capacity,
+        ...locationData
+    };
+    const { data, error } = await supabase.from('locations').insert(mappedData).select().single();
     if (error) throw error;
     return data;
 };
 
-export const updateLocation = async (id, updates) => {
-    const { data, error } = await supabase.from('locations').update(updates).eq('id', id).select().single();
+export const updateLocation = async (id, locationData) => {
+    const mappedData = {
+        name: locationData.name,
+        address: locationData.address,
+        city: locationData.city,
+        state: locationData.state,
+        country: locationData.country,
+        key_capacity: locationData.keyCapacity || locationData.key_capacity,
+        ...locationData
+    };
+    const { data, error } = await supabase.from('locations').update(mappedData).eq('id', id).select().single();
     if (error) throw error;
     return data;
 };

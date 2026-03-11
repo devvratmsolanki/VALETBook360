@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 
-export const getAllUsers = async () => {
+export const getUsers = async () => {
     const { data, error } = await supabase.from('users').select('*, valet_companies:valet_company_id(company_name)').order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];

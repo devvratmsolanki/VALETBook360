@@ -5,19 +5,20 @@ import { ToastContainer } from './components/ui/Toast';
 import Layout from './components/layout/Layout';
 import Login from './pages/Login';
 import OperatorDashboard from './pages/operator/OperatorDashboard';
-import CompanyDashboard from './pages/company/Dashboard';
+import CompanyDashboard from './pages/company/CompanyDashboard';
 import Drivers from './pages/company/Drivers';
-import CompanyTransactions from './pages/company/Transactions';
+import CompanyTransactions from './pages/company/CompanyTransactions';
 import Locations from './pages/company/Locations';
 import Contracts from './pages/company/Contracts';
-import AdminDashboard from './pages/admin/Dashboard';
+import AdminDashboard from './pages/admin/AdminDashboard';
 import Companies from './pages/admin/Companies';
 import Users from './pages/admin/Users';
-import AdminTransactions from './pages/admin/Transactions';
+import AdminTransactions from './pages/admin/AdminTransactions';
 import WhatsAppLogs from './pages/admin/WhatsAppLogs';
 import DriverPerformance from './pages/company/DriverPerformance';
 import LocationDetail from './pages/company/LocationDetail';
 import Staff from './pages/company/Staff';
+import DriverPanel from './pages/driver/DriverPanel';
 
 // Role mapping: database uses 'admin', 'manager', 'valet'
 // admin = super admin (full system access)
@@ -42,6 +43,7 @@ const AuthGate = () => {
     if (!user) return <Navigate to="/login" replace />;
     if (role === 'admin') return <Navigate to="/admin" replace />;
     if (role === 'company') return <Navigate to="/company" replace />;
+    if (role === 'driver') return <Navigate to="/driver" replace />;
     return <Navigate to="/operator" replace />;
 };
 
@@ -56,6 +58,7 @@ function App() {
                         <Route path="/" element={<AuthGate />} />
 
                         <Route path="/operator" element={<ProtectedRoute allowedRoles={['valet', 'company', 'admin']}><OperatorDashboard /></ProtectedRoute>} />
+                        <Route path="/driver" element={<ProtectedRoute allowedRoles={['driver', 'valet', 'company', 'admin']}><DriverPanel /></ProtectedRoute>} />
 
                         <Route path="/company" element={<ProtectedRoute allowedRoles={['company', 'admin']}><CompanyDashboard /></ProtectedRoute>} />
                         <Route path="/company/drivers" element={<ProtectedRoute allowedRoles={['company', 'admin']}><Drivers /></ProtectedRoute>} />

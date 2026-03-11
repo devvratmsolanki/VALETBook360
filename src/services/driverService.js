@@ -6,25 +6,37 @@ export const getDriversByCompany = async (companyId) => {
     return data || [];
 };
 
-export const getAllDrivers = async () => {
+export const getDrivers = async () => {
     const { data, error } = await supabase.from('drivers').select('*, valet_companies:valet_company_id(company_name)').order('staff_id', { ascending: true });
     if (error) throw error;
     return data || [];
 };
 
-export const createDriver = async (driver) => {
-    // Auto-generate staff_id if not present
-    if (!driver.staff_id) {
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        driver.staff_id = `VD-${randomNum}`;
-    }
-    const { data, error } = await supabase.from('drivers').insert(driver).select().single();
+export const createDriver = async (driverData) => {
+    const mappedData = {
+        valet_company_id: driverData.companyId || driverData.valet_company_id,
+        name: driverData.name,
+        phone: driverData.phone,
+        email: driverData.email,
+        staff_id: driverData.staffId || driverData.staff_id,
+        active: driverData.active ?? true,
+        ...driverData
+    };
+    const { data, error } = await supabase.from('drivers').insert(mappedData).select().single();
     if (error) throw error;
     return data;
 };
 
-export const updateDriver = async (id, updates) => {
-    const { data, error } = await supabase.from('drivers').update(updates).eq('id', id).select().single();
+export const updateDriver = async (id, driverData) => {
+    const mappedData = {
+        name: driverData.name,
+        phone: driverData.phone,
+        email: driverData.email,
+        staff_id: driverData.staffId || driverData.staff_id,
+        active: driverData.active,
+        ...driverData
+    };
+    const { data, error } = await supabase.from('drivers').update(mappedData).eq('id', id).select().single();
     if (error) throw error;
     return data;
 };

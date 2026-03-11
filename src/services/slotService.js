@@ -11,10 +11,16 @@ export const getSlotsByLocation = async (locationId) => {
     return data || [];
 };
 
-export const createSlot = async (slot) => {
+export const createSlot = async (slotData) => {
+    const mappedData = {
+        location_id: slotData.locationId || slotData.location_id,
+        slot_name: slotData.slotName || slotData.slot_name,
+        sort_order: slotData.sortOrder || slotData.sort_order,
+        ...slotData
+    };
     const { data, error } = await supabase
         .from('key_slots')
-        .insert(slot)
+        .insert(mappedData)
         .select()
         .single();
     if (error) throw error;

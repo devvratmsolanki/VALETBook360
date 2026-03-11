@@ -12,8 +12,15 @@ export const getVisitorByPhone = async (phone) => {
     return data;
 };
 
-export const createVisitor = async (visitor) => {
-    const { data, error } = await supabase.from('visitors').insert(visitor).select().single();
+export const createVisitor = async (visitorData) => {
+    const mappedData = {
+        name: visitorData.name,
+        phone: visitorData.phone,
+        email: visitorData.email,
+        valet_company_id: visitorData.companyId || visitorData.valet_company_id,
+        ...visitorData
+    };
+    const { data, error } = await supabase.from('visitors').insert(mappedData).select().single();
     if (error) throw error;
     return data;
 };

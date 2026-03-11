@@ -6,8 +6,15 @@ export const findCarByNumber = async (carNumber) => {
     return data;
 };
 
-export const createCar = async (car) => {
-    const { data, error } = await supabase.from('cars').insert(car).select().single();
+export const createCar = async (carData) => {
+    const mappedData = {
+        car_number: carData.carNumber || carData.car_number,
+        make: carData.make,
+        model: carData.model,
+        color: carData.color,
+        ...carData
+    };
+    const { data, error } = await supabase.from('cars').insert(mappedData).select().single();
     if (error) throw error;
     return data;
 };

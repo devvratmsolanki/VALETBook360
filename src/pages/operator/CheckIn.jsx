@@ -5,10 +5,11 @@ import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
+import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import DriverSelect from '../../components/shared/DriverSelect';
 import { searchVisitorByPhone, getVisitorByPhone, createVisitor } from '../../services/visitorService';
 import { findCarByNumber, createCar } from '../../services/carService';
 import { createTransaction } from '../../services/transactionService';
-import { getDriversByCompany } from '../../services/driverService';
 import { getLocationsByCompany } from '../../services/locationService';
 
 const CheckIn = () => {
@@ -25,28 +26,23 @@ const CheckIn = () => {
     const [showDropdown, setShowDropdown] = useState(false);
     const [existingVisitor, setExistingVisitor] = useState(null);
     const [isReturning, setIsReturning] = useState(false);
-    const [drivers, setDrivers] = useState([]);
     const [locations, setLocations] = useState([]);
     const dropdownRef = useRef(null);
     const fileInputRef = useRef(null);
 
-    // Fetch drivers and locations
+    // Fetch locations
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchLocations = async () => {
             try {
                 if (companyId) {
-                    const [driverList, locationList] = await Promise.all([
-                        getDriversByCompany(companyId),
-                        getLocationsByCompany(companyId),
-                    ]);
-                    setDrivers(driverList.filter(d => d.active));
+                    const locationList = await getLocationsByCompany(companyId);
                     setLocations(locationList);
                 }
             } catch (err) {
-                console.error('Error loading drivers/locations:', err);
+                console.error('Error loading locations:', err);
             }
         };
-        fetchData();
+        fetchLocations();
     }, [companyId]);
 
     // Phone search — trigger after 7 digits
@@ -151,7 +147,6 @@ const CheckIn = () => {
             const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
             if (webhookUrl && webhookUrl !== 'your_n8n_webhook_url_here') {
                 try {
-                    const driverName = drivers.find(d => d.id === selectedDriver)?.name;
                     await fetch(webhookUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -161,7 +156,6 @@ const CheckIn = () => {
                             phone,
                             car_number: carNumber.toUpperCase(),
                             parking_slot: parkingLocation,
-                            driver_name: driverName || 'N/A',
                         }),
                     });
                 } catch (webhookErr) {
@@ -180,7 +174,6 @@ const CheckIn = () => {
         }
     };
 
-    const driverOptions = [{ value: '', label: 'Select a driver... *' }, ...drivers.map(d => ({ value: d.id, label: d.name }))];
     const locationOptions = [{ value: '', label: 'Select location...' }, ...locations.map(l => ({ value: l.id, label: l.name }))];
 
     return (
@@ -291,19 +284,19 @@ const CheckIn = () => {
                         </div>
                     </div>
 
-                    {/* Driver Dropdown — REQUIRED */}
-                    <Select
-                        label={<span className="flex items-center gap-2"><UserCheck className="h-3.5 w-3.5 text-brand-500" /> Assigned Driver <span className="text-red-400">*</span></span>}
-                        options={driverOptions}
+                    {/* Driver Select */}
+                    <DriverSelect
+                        companyId={companyId}
                         value={selectedDriver}
                         onChange={(e) => setSelectedDriver(e.target.value)}
+                        required
                     />
 
                     {/* Submit */}
                     <Button type="submit" size="lg" className="w-full mt-4" disabled={loading}>
                         {loading ? (
                             <span className="flex items-center gap-2">
-                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+                                <LoadingSpinner size="sm" color="white" />
                                 Checking In...
                             </span>
                         ) : (
