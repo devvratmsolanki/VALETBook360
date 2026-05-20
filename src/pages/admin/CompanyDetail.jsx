@@ -16,6 +16,7 @@ import Input from '../../components/ui/Input';
 import Badge from '../../components/ui/Badge';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { toast } from '../../components/ui/Toast';
+import logger from '../../lib/logger';
 import {
     ArrowLeft, Building2, MapPin, Users, Car, Plus, Trash2,
     Phone, Mail, UserCheck, UserX, Key, Eye, EyeOff, Shield
@@ -52,8 +53,8 @@ const CompanyDetail = () => {
             setStaff(s);
             setDrivers(d);
         } catch (err) {
-            console.error(err);
-            toast.error('Failed to load company');
+            logger.error(err);
+            toast.error(err?.message || 'Failed to load company');
         } finally {
             setLoading(false);
         }
@@ -209,8 +210,8 @@ const LocationsTab = ({ companyId, locations, onRefresh }) => {
             await deleteLocation(loc.id);
             toast.success('Deleted');
             onRefresh();
-        } catch {
-            toast.error('Failed to delete');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to delete');
         }
     };
 
@@ -314,8 +315,8 @@ const OperatorsTab = ({ companyId, operators, locations, onRefresh }) => {
             await deleteUser(u.id);
             toast.success('Removed');
             onRefresh();
-        } catch {
-            toast.error('Failed');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to remove operator');
         }
     };
 
@@ -445,8 +446,8 @@ const DriversTab = ({ companyId, drivers, locations, onRefresh }) => {
         try {
             await toggleDriverActive(d.id, !d.active);
             onRefresh();
-        } catch {
-            toast.error('Failed');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to toggle driver');
         }
     };
 

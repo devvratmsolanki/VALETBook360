@@ -4,13 +4,14 @@ import { getTransactionStats } from '../../services/transactionService';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Card from '../../components/ui/Card';
 import { Car, Building2, Users, Activity, TrendingUp, Clock, CheckCircle, ArrowRight, MapPin } from 'lucide-react';
+import logger from '../../lib/logger';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
     const [stats, setStats] = useState({ total: 0, active: 0, parked: 0, requested: 0, ready: 0, delivered: 0, today: 0 });
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => { getTransactionStats().then(setStats).catch(console.error).finally(() => setLoading(false)); }, []);
+    useEffect(() => { getTransactionStats().then(setStats).catch(logger.error).finally(() => setLoading(false)); }, []);
 
     const statCards = [
         { label: 'Total Transactions', value: stats.total, icon: Activity, color: 'text-blue-400', bg: 'bg-blue-500/10', href: '/admin/transactions' },

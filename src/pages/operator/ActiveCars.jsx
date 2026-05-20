@@ -117,9 +117,9 @@ const ActiveCars = () => {
             }
 
             toast.success(`Status updated to ${newStatus}`);
-        } catch {
+        } catch (err) {
             setTransactions(prev);
-            toast.error('Failed to update status');
+            toast.error(err?.message || 'Failed to update status');
         }
     };
 

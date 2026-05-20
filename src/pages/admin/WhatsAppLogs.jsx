@@ -17,8 +17,8 @@ const WhatsAppLogs = () => {
             const data = await getWhatsAppLogs();
             setLogs(data);
             setFiltered(data);
-        } catch {
-            toast.error('Failed to load logs');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to load logs');
         } finally {
             setLoading(false);
         }

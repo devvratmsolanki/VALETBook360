@@ -25,8 +25,8 @@ const Companies = () => {
     const fetchCompanies = async () => {
         try {
             setCompanies(await getCompanies());
-        } catch {
-            toast.error('Failed to load companies');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to load companies');
         } finally {
             setLoading(false);
         }
@@ -76,8 +76,8 @@ const Companies = () => {
             await deleteCompany(id);
             toast.success('Deleted');
             fetchCompanies();
-        } catch {
-            toast.error('Failed to delete');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to delete');
         }
     };
 

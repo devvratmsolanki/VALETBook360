@@ -7,6 +7,7 @@ import { uploadMultiplePhotos } from '../../services/storageService';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { toast } from '../../components/ui/Toast';
 import { parseUTC } from '../../lib/utils';
+import logger from '../../lib/logger';
 import { Car, MapPin, Key, Clock, Navigation, Check, ArrowRight, Loader2, User, Phone, RefreshCw, Camera, MessageSquare } from 'lucide-react';
 
 // ─── Live Timer ───
@@ -68,7 +69,7 @@ const DriverPanel = () => {
                     setLoading(false);
                 }
             } catch (err) {
-                console.error('Driver lookup failed:', err);
+                logger.error('Driver lookup failed:', err);
                 setLoading(false);
             }
         };
@@ -93,7 +94,7 @@ const DriverPanel = () => {
             if (error) throw error;
             setTransactions(data || []);
         } catch (err) {
-            console.error('Error fetching driver transactions:', err);
+            logger.error('Error fetching driver transactions:', err);
             toast.error('Failed to load tasks');
         } finally {
             setLoading(false);
@@ -140,7 +141,7 @@ const DriverPanel = () => {
                 coordinates = `${lat},${lng}`;
                 mapLink = `https://maps.google.com/?q=${lat},${lng}`;
             } catch (err) {
-                console.error('GPS Error:', err);
+                logger.error('GPS Error:', err);
                 if (err.code === 1) {
                     setShowPermissionModal(true);
                 } else if (err.code === 2 || err.code === 3) {
@@ -177,7 +178,7 @@ const DriverPanel = () => {
                     const uploadedUrls = await uploadMultiplePhotos(parkingPhotoFiles[txId], txId, 'parking');
                     extraFields.parking_photos = uploadedUrls;
                 } catch (uploadErr) {
-                    console.error('Photo upload error:', uploadErr);
+                    logger.error('Photo upload error:', uploadErr);
                     toast.warning('Photos could not be uploaded, continuing without them');
                 }
             }
@@ -190,8 +191,8 @@ const DriverPanel = () => {
             setParkingPhotoFiles(prev => { const n = { ...prev }; delete n[txId]; return n; });
             fetchTransactions();
         } catch (err) {
-            console.error('Mark parked error:', err);
-            toast.error('Failed to mark as parked');
+            logger.error('Mark parked error:', err);
+            toast.error(err?.message || 'Failed to mark as parked');
         } finally {
             setGpsLoading(null);
         }
@@ -204,8 +205,8 @@ const DriverPanel = () => {
             await updateTransactionStatus(txId, newStatus);
             toast.success(`${label} updated!`);
             fetchTransactions();
-        } catch {
-            toast.error(`Failed to update: ${label}`);
+        } catch (err) {
+            toast.error(err?.message || `Failed to update: ${label}`);
         } finally {
             setActionLoading(null);
         }

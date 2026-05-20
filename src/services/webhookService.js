@@ -1,6 +1,7 @@
 // Centralized webhook service — routes through Supabase Edge Function
 // The edge function handles Yeti's two-step auth (API Key → JWT → Bearer) server-side
 import { supabase } from '../lib/supabase';
+import logger from '../lib/logger';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -9,22 +10,22 @@ const isConfigured = () => SUPABASE_URL && SUPABASE_ANON_KEY;
 
 const sendTemplate = async (phone, templateName, components) => {
     if (!isConfigured()) {
-        console.warn('[WhatsApp] Supabase not configured, skipping notification');
+        logger.warn('[WhatsApp] Supabase not configured, skipping notification');
         return;
     }
     if (!phone) {
-        console.warn('[WhatsApp] No phone number provided, skipping');
+        logger.warn('[WhatsApp] No phone number provided, skipping');
         return;
     }
 
     const cleanPhone = phone.replace(/\D/g, '').trim();
-    console.log(`[WhatsApp] Sending "${templateName}" to ${cleanPhone} via Edge Function...`);
+    logger.debug(`[WhatsApp] Sending "${templateName}" to ${cleanPhone} via Edge Function...`);
 
     // The edge function requires a signed-in user — passing the anon key
     // alone would let anyone with that public key spam WhatsApp messages.
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
-        console.warn('[WhatsApp] No active session, skipping notification');
+        logger.warn('[WhatsApp] No active session, skipping notification');
         return;
     }
 
@@ -46,14 +47,14 @@ const sendTemplate = async (phone, templateName, components) => {
         const data = await response.json();
 
         if (response.ok && data.success) {
-            console.log(`[WhatsApp] SUCCESS! Template "${templateName}" sent to ${cleanPhone}`);
+            logger.debug(`[WhatsApp] SUCCESS! Template "${templateName}" sent to ${cleanPhone}`);
             return data;
         }
 
-        console.error(`[WhatsApp] Failed (${response.status}):`, JSON.stringify(data, null, 2));
+        logger.error(`[WhatsApp] Failed (${response.status}):`, JSON.stringify(data, null, 2));
         return data;
     } catch (err) {
-        console.error(`[WhatsApp] Network error:`, err.message);
+        logger.error(`[WhatsApp] Network error:`, err.message);
     }
 };
 

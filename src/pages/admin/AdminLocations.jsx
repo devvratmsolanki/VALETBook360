@@ -29,8 +29,8 @@ const AdminLocations = () => {
             const [l, c] = await Promise.all([getLocations(), getCompanies()]);
             setLocations(l);
             setCompanies(c);
-        } catch {
-            toast.error('Failed to load locations');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to load locations');
         } finally {
             setLoading(false);
         }
@@ -92,8 +92,8 @@ const AdminLocations = () => {
             await deleteLocation(loc.id);
             toast.success('Location deleted');
             fetchAll();
-        } catch {
-            toast.error('Failed to delete');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to delete');
         }
     };
 

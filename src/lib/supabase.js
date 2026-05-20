@@ -5,7 +5,12 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 let supabase;
 
-if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_supabase_url_here') {
+// `isMockClient` is exported so the UI can render an unmistakable banner when
+// the app boots without real credentials. Otherwise a demo-mode deploy looks
+// indistinguishable from a broken production deploy.
+export const isMockClient = !(supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_supabase_url_here');
+
+if (!isMockClient) {
     supabase = createClient(supabaseUrl, supabaseAnonKey, {
         auth: {
             storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
@@ -14,7 +19,14 @@ if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_supabase_url_here') 
         },
     });
 } else {
-    console.warn('Supabase not configured. Running in demo mode.');
+    // In production builds we want this to be loud — silent demo-mode in
+    // production was making real outages look like user error. The console
+    // warning stays for devs; the runtime banner is rendered from App.jsx.
+    if (import.meta.env.PROD) {
+        console.error('[Supabase] Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY in production build. Running in demo mode.');
+    } else {
+        console.warn('Supabase not configured. Running in demo mode.');
+    }
     const mockResp = { data: null, error: null };
     const mockQuery = () => ({
         select: () => mockQuery(),

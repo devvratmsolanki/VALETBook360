@@ -37,8 +37,8 @@ const Users = () => {
             const [u, c] = await Promise.all([getUsers(), getCompanies()]);
             setUsers(u);
             setCompanies(c);
-        } catch {
-            toast.error('Failed to load');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to load users');
         } finally {
             setLoading(false);
         }
@@ -91,8 +91,8 @@ const Users = () => {
             await updateUserRole(id, newRole);
             toast.success('Role updated');
             fetchAll();
-        } catch {
-            toast.error('Update failed');
+        } catch (err) {
+            toast.error(err?.message || 'Update failed');
         }
     };
 
@@ -103,8 +103,8 @@ const Users = () => {
             await deleteUser(u.id);
             toast.success('User deleted');
             fetchAll();
-        } catch {
-            toast.error('Delete failed');
+        } catch (err) {
+            toast.error(err?.message || 'Delete failed');
         }
     };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserCheck } from 'lucide-react';
 import Select from '../ui/Select';
 import { getDriversByCompany } from '../../services/driverService';
+import logger from '../../lib/logger';
 
 const DriverSelect = ({ companyId, value, onChange, label, required = false, error = '' }) => {
     const [drivers, setDrivers] = useState([]);
@@ -15,7 +16,7 @@ const DriverSelect = ({ companyId, value, onChange, label, required = false, err
                 const list = await getDriversByCompany(companyId);
                 setDrivers(list.filter(d => d.active));
             } catch (err) {
-                console.error('[DriverSelect] Error fetching drivers:', err);
+                logger.error('[DriverSelect] Error fetching drivers:', err);
             } finally {
                 setLoading(false);
             }

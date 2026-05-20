@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import logger from '../lib/logger';
 
 const AuthContext = createContext({});
 
@@ -16,13 +17,13 @@ export const AuthProvider = ({ children }) => {
         const initAuth = async () => {
             try {
                 const { data: { session } } = await supabase.auth.getSession();
-                console.log('[Auth] Initial session:', session ? 'found' : 'none');
+                logger.debug('[Auth] Initial session:', session ? 'found' : 'none');
                 if (session?.user && mounted) {
                     setUser(session.user);
                     await fetchProfile(session.user);
                 }
             } catch (err) {
-                console.error('[Auth] getSession error:', err);
+                logger.error('[Auth] getSession error:', err);
             } finally {
                 if (mounted) setLoading(false);
             }
@@ -32,7 +33,7 @@ export const AuthProvider = ({ children }) => {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                console.log('[Auth] State changed:', event, session ? 'has session' : 'no session');
+                logger.debug('[Auth] State changed:', event, session ? 'has session' : 'no session');
                 if (!mounted) return;
 
                 if (event === 'SIGNED_IN' && session?.user) {
@@ -61,7 +62,7 @@ export const AuthProvider = ({ children }) => {
         const userId = authUser.id;
         const email = authUser.email;
         try {
-            console.log('[Auth] Fetching profile for:', userId);
+            logger.debug('[Auth] Fetching profile for:', userId);
             let { data, error } = await supabase
                 .from('users')
                 .select('*, valet_companies(company_name, phone), location:location_id(id, name)')
@@ -69,7 +70,7 @@ export const AuthProvider = ({ children }) => {
                 .single();
 
             if (error) {
-                console.warn('[Auth] Detailed fetch failed (might be missing location_id column). Trying fallback...');
+                logger.warn('[Auth] Detailed fetch failed (might be missing location_id column). Trying fallback...');
                 const { data: fallbackData, error: fallbackError } = await supabase
                     .from('users')
                     .select('*, valet_companies(company_name, phone)')
@@ -81,14 +82,14 @@ export const AuthProvider = ({ children }) => {
             }
 
             if (!data) {
-                console.warn('[Auth] No profile found. Auto-creating...');
+                logger.warn('[Auth] No profile found. Auto-creating...');
                 await autoCreateProfile(userId, email);
             } else {
-                console.log('[Auth] Profile loaded, role:', data?.role);
+                logger.debug('[Auth] Profile loaded, role:', data?.role);
                 setProfile(data);
             }
         } catch (err) {
-            console.error('[Auth] Profile fetch exception:', err);
+            logger.error('[Auth] Profile fetch exception:', err);
             await autoCreateProfile(userId, email);
         }
     };
@@ -110,7 +111,7 @@ export const AuthProvider = ({ children }) => {
             const isFirstUser = !existingAdmins || existingAdmins.length === 0;
             const role = isFirstUser ? 'admin' : 'valet';
 
-            console.log('[Auth] Auto-creating profile, role:', role, '(first admin:', isFirstUser, ')');
+            logger.debug('[Auth] Auto-creating profile, role:', role, '(first admin:', isFirstUser, ')');
 
             const { data: newProfile, error: insertError } = await supabase
                 .from('users')
@@ -124,16 +125,16 @@ export const AuthProvider = ({ children }) => {
                 .single();
 
             if (insertError) {
-                console.error('[Auth] Auto-create failed:', insertError.message);
+                logger.error('[Auth] Auto-create failed:', insertError.message);
                 // Fallback: set a minimal profile so routing works. Always default to the
                 // least-privileged role; never silently grant admin on insert failure.
                 setProfile({ id: userId, email, role: 'valet', name: email.split('@')[0] });
             } else {
-                console.log('[Auth] Profile auto-created:', newProfile);
+                logger.debug('[Auth] Profile auto-created:', newProfile);
                 setProfile(newProfile);
             }
         } catch (err) {
-            console.error('[Auth] Auto-create exception:', err);
+            logger.error('[Auth] Auto-create exception:', err);
             setProfile({ id: userId, email, role: 'valet', name: email.split('@')[0] });
         }
     };

@@ -11,6 +11,7 @@ import { searchVisitorByPhone, getVisitorByPhone, createVisitor } from '../../se
 import { findCarByNumber, createCar } from '../../services/carService';
 import { createTransaction } from '../../services/transactionService';
 import { getLocationsByCompany } from '../../services/locationService';
+import logger from '../../lib/logger';
 
 const CheckIn = () => {
     const { companyId } = useAuth();
@@ -39,7 +40,7 @@ const CheckIn = () => {
                     setLocations(locationList);
                 }
             } catch (err) {
-                console.error('Error loading locations:', err);
+                logger.error('Error loading locations:', err);
             }
         };
         fetchLocations();
@@ -59,7 +60,7 @@ const CheckIn = () => {
                 setSearchResults(results);
                 setShowDropdown(results.length > 0);
             } catch (err) {
-                console.error('Search error:', err);
+                logger.error('Search error:', err);
             }
         }, 300);
         return () => clearTimeout(timer);
@@ -87,7 +88,7 @@ const CheckIn = () => {
                 setCarMake(`${lastCar.make || ''} ${lastCar.model || ''}`.trim());
             }
         } catch (err) {
-            console.error('Error fetching visitor details:', err);
+            logger.error('Error fetching visitor details:', err);
         }
     };
 
@@ -159,7 +160,7 @@ const CheckIn = () => {
                         }),
                     });
                 } catch (webhookErr) {
-                    console.warn('Webhook call failed:', webhookErr);
+                    logger.warn('Webhook call failed:', webhookErr);
                 }
             }
 

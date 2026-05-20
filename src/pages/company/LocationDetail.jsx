@@ -14,6 +14,7 @@ import { getSlotsByLocation, updateSlotName, deleteSlot, bulkGenerateSlots } fro
 import { getDriversByCompany } from '../../services/driverService';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
+import logger from '../../lib/logger';
 
 const LocationDetail = () => {
     const { locationId } = useParams();
@@ -54,8 +55,8 @@ const LocationDetail = () => {
                 setTransactions(txRes.data || []);
                 setSlots(slotRes || []);
             } catch (err) {
-                toast.error('Failed to load location');
-                console.error(err);
+                toast.error(err?.message || 'Failed to load location');
+                logger.error(err);
             } finally {
                 setLoading(false);
             }

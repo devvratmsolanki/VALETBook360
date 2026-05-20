@@ -24,8 +24,8 @@ const AdminTransactions = () => {
             setTransactions(data);
             setFiltered(data);
             setStats(s);
-        } catch {
-            toast.error('Failed to load transactions');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to load transactions');
         } finally {
             setLoading(false);
         }

@@ -18,11 +18,11 @@ const Transactions = () => {
     const [searchParams] = useSearchParams();
     const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
 
-    const fetchData = async () => { try { const d = await getTransactions(companyId); setTransactions(d); setFiltered(d); } catch { toast.error('Failed to load'); } finally { setLoading(false); } };
+    const fetchData = async () => { try { const d = await getTransactions(companyId); setTransactions(d); setFiltered(d); } catch (err) { toast.error(err?.message || 'Failed to load'); } finally { setLoading(false); } };
     useEffect(() => { fetchData(); }, []);
     useEffect(() => { let r = transactions; if (statusFilter !== 'all') r = r.filter(t => t.status === statusFilter); if (search) { const s = search.toLowerCase(); r = r.filter(t => t.cars?.car_number?.toLowerCase().includes(s) || t.visitors?.name?.toLowerCase().includes(s) || t.visitors?.phone?.includes(s)); } setFiltered(r); }, [search, statusFilter, transactions]);
 
-    const handleStatusUpdate = async (id, status) => { try { await updateTransactionStatus(id, status); toast.success(`Updated to ${status}`); fetchData(); } catch { toast.error('Update failed'); } };
+    const handleStatusUpdate = async (id, status) => { try { await updateTransactionStatus(id, status); toast.success(`Updated to ${status}`); fetchData(); } catch (err) { toast.error(err?.message || 'Update failed'); } };
     const statuses = ['all', 'parked', 'requested', 'ready', 'delivered'];
 
     return (

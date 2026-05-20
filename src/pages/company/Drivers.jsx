@@ -38,8 +38,8 @@ const Drivers = () => {
             ]);
             setDrivers(d);
             setLocations(l);
-        } catch {
-            toast.error('Failed to load drivers');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to load drivers');
         } finally {
             setLoading(false);
         }
@@ -108,8 +108,8 @@ const Drivers = () => {
             await toggleDriverActive(id, !active);
             toast.success(active ? 'Driver deactivated' : 'Driver activated');
             fetchAll();
-        } catch {
-            toast.error('Failed to update');
+        } catch (err) {
+            toast.error(err?.message || 'Failed to update');
         }
     };
 

@@ -12,7 +12,7 @@ const Contracts = () => {
     const [contracts, setContracts] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => { const f = async () => { try { setContracts(companyId ? await getContractsByCompany(companyId) : []); } catch { toast.error('Failed to load'); } finally { setLoading(false); } }; f(); }, [companyId]);
+    useEffect(() => { const f = async () => { try { setContracts(companyId ? await getContractsByCompany(companyId) : []); } catch (err) { toast.error(err?.message || 'Failed to load'); } finally { setLoading(false); } }; f(); }, [companyId]);
 
     return (
         <div className="animate-fade-in">

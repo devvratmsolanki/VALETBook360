@@ -20,8 +20,8 @@ The Flutter driver companion app lives in [mobile-app/](mobile-app/) and is inde
 ### Single-page React app with Supabase backend
 React 19 + Vite + Tailwind v4 SPA. The entire backend is Supabase: Postgres (RLS-protected), Auth, Realtime channels, Storage, and Edge Functions. There is no Node/Express server. Auth session is intentionally kept in `sessionStorage` rather than `localStorage` ([src/lib/supabase.js](src/lib/supabase.js#L11)).
 
-### Role model — code names differ from DB names
-[src/App.jsx](src/App.jsx) carries an authoritative comment: the database `users.role` column stores `admin`, `manager`, `valet` (plus `driver`), but the frontend everywhere treats them as `admin` / `company` / `valet` / `driver`. `company` in the UI corresponds to `manager` in the DB. When wiring new routes or queries, match whichever side you are touching — don't normalise without checking the other end.
+### Role model
+The database `users.role` column and the frontend share the same vocabulary: `admin`, `company`, `valet`, `driver`. There is no rename layer — what the UI calls `company` is also called `company` in the DB (see [supabase/functions/create-staff/index.ts](supabase/functions/create-staff/index.ts) where the edge function enforces `role === 'company'`). When promoting/demoting users from the client, `userService.updateUserRole` whitelists the three non-admin roles; admin promotion must be done via the SQL editor.
 
 Routing is gated by `<ProtectedRoute allowedRoles={[...]}>` and a top-level `<AuthGate>` that redirects to `/admin`, `/company`, `/driver`, or `/operator` based on role. Admin can reach everything; `company` can reach operator/driver routes; `valet` is mostly confined to `/operator` and `/driver`.
 

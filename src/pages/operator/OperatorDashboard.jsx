@@ -23,6 +23,7 @@ import { getLocationsByCompany } from '../../services/locationService';
 import { sendDriverAssigned, sendCarReady, sendCarDelivered } from '../../services/webhookService';
 import { uploadMultiplePhotos } from '../../services/storageService';
 import { parseUTC } from '../../lib/utils';
+import logger from '../../lib/logger';
 
 // ─── Live Timer Component ───
 const LiveTimer = ({ since }) => {
@@ -120,7 +121,7 @@ const OperatorDashboard = () => {
                 if (loc) setLocationCapacity(loc.key_capacity || 0);
             }
         } catch (err) {
-            console.error('Fetch error:', err);
+            logger.error('Fetch error:', err);
         } finally {
             setTxLoading(false);
             setIsRefreshing(false);
@@ -165,7 +166,7 @@ const OperatorDashboard = () => {
                     setKeyCode('');
                 }
             } catch (err) {
-                console.error('Error fetching key slot:', err);
+                logger.error('Error fetching key slot:', err);
             }
         } else {
             setLocationCapacity(0);
@@ -190,7 +191,7 @@ const OperatorDashboard = () => {
             });
             setQrModal({ carNumber: cleanCar, name: guestName.trim(), qrDataUrl, waUrl });
         } catch (e) {
-            console.error('QR generation error:', e);
+            logger.error('QR generation error:', e);
             toast.error('Failed to generate QR code');
         }
     };
@@ -269,7 +270,7 @@ const OperatorDashboard = () => {
                     const urls = await uploadMultiplePhotos(checkinPhotoFiles, currentTxId, 'checkin');
                     updates.photo_urls = urls;
                 } catch (uploadErr) {
-                    console.error('Photo upload error:', uploadErr);
+                    logger.error('Photo upload error:', uploadErr);
                     toast.warning('Photos could not be uploaded, continuing without them');
                 }
             }
@@ -297,7 +298,7 @@ const OperatorDashboard = () => {
             await confirmKeyIn(txId);
             toast.success('Key secured ✓');
             fetchAll();
-        } catch { toast.error('Key confirmation failed'); }
+        } catch (err) { toast.error(err?.message || 'Key confirmation failed'); }
     };
 
     // ─── Right panel: retrieval actions ───
@@ -326,21 +327,25 @@ const OperatorDashboard = () => {
             });
             toast.success(`Driver assigned! ETA: ${etaMinutes} min`);
             setShowAssignModal(false); setSelectedTx(null); fetchAll();
-        } catch { toast.error('Assignment failed'); } finally { setAssigning(false); }
+        } catch (err) { toast.error(err?.message || 'Assignment failed'); } finally { setAssigning(false); }
     };
 
     const handleStatus = async (id, status) => {
-        try {
-            // Payment gating: cannot deliver without payment
-            if (status === 'delivered') {
-                const tx = transactions.find(t => t.id === id);
-                if (tx && tx.payment_status !== 'paid') {
-                    return toast.error('⛔ Payment must be confirmed before delivery');
-                }
-            }
-
-            await updateTransactionStatus(id, status);
+        // Payment gating: cannot deliver without payment
+        if (status === 'delivered') {
             const tx = transactions.find(t => t.id === id);
+            if (tx && tx.payment_status !== 'paid') {
+                return toast.error('⛔ Payment must be confirmed before delivery');
+            }
+        }
+
+        // Optimistic update with rollback on failure — matches ActiveCars so
+        // the UI never lies about which state a transaction is in.
+        const prev = transactions;
+        setTransactions(prev.map(t => t.id === id ? { ...t, status } : t));
+        try {
+            await updateTransactionStatus(id, status);
+            const tx = prev.find(t => t.id === id);
 
             if (status === 'arrived' && tx) {
                 const loc = locations.find(l => l.id === tx.location_id);
@@ -352,7 +357,10 @@ const OperatorDashboard = () => {
 
             toast.success(status.replace(/_/g, ' '));
             fetchAll();
-        } catch { toast.error('Update failed'); }
+        } catch (err) {
+            setTransactions(prev);
+            toast.error(err?.message || 'Update failed');
+        }
     };
 
     // ─── Payment toggle ───
@@ -363,8 +371,8 @@ const OperatorDashboard = () => {
             toast.success(newStatus === 'paid' ? '💰 Payment confirmed' : 'Payment unmarked');
             fetchAll();
         } catch (err) {
-            console.error('Payment error:', err);
-            toast.error('Payment update failed');
+            logger.error('Payment error:', err);
+            toast.error(err?.message || 'Payment update failed');
         }
     };
 

@@ -4,6 +4,7 @@ import { Bell, Car, CheckCircle, Clock, Navigation, Key } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { parseUTC } from '../../lib/utils';
+import logger from '../../lib/logger';
 
 // Visible-status whitelist + presentation per transaction status.
 const STATUS_META = {
@@ -81,7 +82,7 @@ const NotificationsBell = () => {
         const load = async () => {
             const { data, error } = await buildQuery();
             if (cancelled) return;
-            if (error) { console.error('[Notifications]', error); return; }
+            if (error) { logger.error('[Notifications]', error); return; }
             setItems(data || []);
         };
 

@@ -20,7 +20,7 @@ const Locations = () => {
     const [formData, setFormData] = useState({ name: '', address: '', city: '', state: '', country: '', key_capacity: 0 });
     const [saving, setSaving] = useState(false);
 
-    const fetchLocations = async () => { try { setLocations(companyId ? await getLocationsByCompany(companyId) : []); } catch { toast.error('Failed to load locations'); } finally { setLoading(false); } };
+    const fetchLocations = async () => { try { setLocations(companyId ? await getLocationsByCompany(companyId) : []); } catch (err) { toast.error(err?.message || 'Failed to load locations'); } finally { setLoading(false); } };
     useEffect(() => { fetchLocations(); }, [companyId]);
     const handleCreate = async (e) => {
         e.preventDefault();
@@ -40,12 +40,12 @@ const Locations = () => {
             setFormData({ name: '', address: '', city: '', state: '', country: '', key_capacity: 0 });
             fetchLocations();
         } catch (err) {
-            toast.error(err.message);
+            toast.error(err?.message || 'Failed to create location');
         } finally {
             setSaving(false);
         }
     };
-    const handleDelete = async (id, e) => { e.stopPropagation(); if (!confirm('Delete this location?')) return; try { await deleteLocation(id); toast.success('Location deleted'); fetchLocations(); } catch { toast.error('Failed to delete'); } };
+    const handleDelete = async (id, e) => { e.stopPropagation(); if (!confirm('Delete this location?')) return; try { await deleteLocation(id); toast.success('Location deleted'); fetchLocations(); } catch (err) { toast.error(err?.message || 'Failed to delete'); } };
 
     return (
         <div className="animate-fade-in">

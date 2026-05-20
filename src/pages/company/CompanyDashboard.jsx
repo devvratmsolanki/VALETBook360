@@ -8,6 +8,7 @@ import Button from '../../components/ui/Button';
 import { toast } from '../../components/ui/Toast';
 import { formatTime } from '../../lib/utils';
 import { Car, TrendingUp, Clock, Activity, ArrowRight } from 'lucide-react';
+import logger from '../../lib/logger';
 
 const CompanyDashboard = () => {
     const navigate = useNavigate();
@@ -16,11 +17,11 @@ const CompanyDashboard = () => {
     const [recentTx, setRecentTx] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const fetchData = async () => { try { const [s, a] = await Promise.all([getTransactionStats(companyId), getActiveTransactions(companyId)]); setStats(s); setRecentTx(a.slice(0, 5)); } catch (err) { console.error(err); } finally { setLoading(false); } };
+    const fetchData = async () => { try { const [s, a] = await Promise.all([getTransactionStats(companyId), getActiveTransactions(companyId)]); setStats(s); setRecentTx(a.slice(0, 5)); } catch (err) { logger.error(err); } finally { setLoading(false); } };
 
     useEffect(() => { fetchData(); const sub = subscribeToTransactions(() => fetchData()); return () => sub.unsubscribe(); }, []);
 
-    const handleStatusUpdate = async (id, status) => { try { await updateTransactionStatus(id, status); toast.success(`Updated to ${status}`); fetchData(); } catch { toast.error('Update failed'); } };
+    const handleStatusUpdate = async (id, status) => { try { await updateTransactionStatus(id, status); toast.success(`Updated to ${status}`); fetchData(); } catch (err) { toast.error(err?.message || 'Update failed'); } };
 
     const statCards = [
         { label: 'Active Cars', value: stats.active, icon: Car, color: 'text-brand-400', bg: 'bg-brand-500/10', href: '/company/transactions?status=parked' },
