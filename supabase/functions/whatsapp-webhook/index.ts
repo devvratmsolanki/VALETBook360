@@ -3,20 +3,61 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-hub-signature-256",
 };
 
 const YETI_WABA_ID = Deno.env.get("YETI_WABA_ID");
 const YETI_PHONE_ID = Deno.env.get("YETI_PHONE_NUMBER_ID");
 const YETI_API_URL = Deno.env.get("YETI_API_URL") || `https://crm.yeti.marketing/api/meta/v19.0/${YETI_PHONE_ID}/messages`;
 const YETI_ACCESS_TOKEN = Deno.env.get("YETI_ACCESS_TOKEN");
+// Meta WhatsApp signs webhooks with HMAC-SHA256 of the raw body, keyed by
+// the app secret. Without verifying this, any attacker who knows the
+// endpoint URL can forge "get my car back" requests for any guest phone.
+const META_APP_SECRET = Deno.env.get("META_APP_SECRET") || "";
+
+async function verifySignature(rawBody: string, signatureHeader: string | null): Promise<boolean> {
+    if (!META_APP_SECRET) {
+        // Fail closed unless the operator explicitly disables verification.
+        return Deno.env.get("WEBHOOK_SKIP_SIGNATURE") === "true";
+    }
+    if (!signatureHeader || !signatureHeader.startsWith("sha256=")) return false;
+
+    const provided = signatureHeader.slice("sha256=".length).toLowerCase();
+    const key = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(META_APP_SECRET),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"],
+    );
+    const sigBytes = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody));
+    const computed = Array.from(new Uint8Array(sigBytes))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+    if (provided.length !== computed.length) return false;
+    let diff = 0;
+    for (let i = 0; i < computed.length; i++) {
+        diff |= provided.charCodeAt(i) ^ computed.charCodeAt(i);
+    }
+    return diff === 0;
+}
 
 Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
     try {
-        const body = await req.json();
-        console.log("Webhook received:", JSON.stringify(body, null, 2));
+        const rawBody = await req.text();
+        const sigOk = await verifySignature(rawBody, req.headers.get("x-hub-signature-256"));
+        if (!sigOk) {
+            console.warn("Webhook signature verification failed");
+            return new Response(JSON.stringify({ error: "invalid_signature" }), {
+                status: 403,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+        const body = JSON.parse(rawBody);
+        console.log("Webhook received (verified):", JSON.stringify(body, null, 2));
 
         // 1. Extract sender and text from Yeti/Meta webhook
         // Meta standard: entry[0].changes[0].value.messages[0]

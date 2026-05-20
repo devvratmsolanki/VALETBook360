@@ -1,5 +1,7 @@
 // Centralized webhook service — routes through Supabase Edge Function
 // The edge function handles Yeti's two-step auth (API Key → JWT → Bearer) server-side
+import { supabase } from '../lib/supabase';
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -18,12 +20,21 @@ const sendTemplate = async (phone, templateName, components) => {
     const cleanPhone = phone.replace(/\D/g, '').trim();
     console.log(`[WhatsApp] Sending "${templateName}" to ${cleanPhone} via Edge Function...`);
 
+    // The edge function requires a signed-in user — passing the anon key
+    // alone would let anyone with that public key spam WhatsApp messages.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+        console.warn('[WhatsApp] No active session, skipping notification');
+        return;
+    }
+
     try {
         const response = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Authorization': `Bearer ${session.access_token}`,
+                'apikey': SUPABASE_ANON_KEY,
             },
             body: JSON.stringify({
                 phone: cleanPhone,
@@ -55,7 +66,7 @@ export const sendCarParked = ({ guest_name, phone, car_number, parking_slot, dri
             type: "body",
             parameters: [
                 { type: "text", text: guest_name || 'Valued Guest' },
-                { type: "text", text: parking_slot || 'Main Parking' },
+                { type: "text", text: car_number || parking_slot || 'Main Parking' },
                 { type: "text", text: company_name || 'VALETBook360' },
                 { type: "text", text: timeStr },
                 { type: "text", text: driver_name || 'Valet Agent' },
@@ -127,7 +138,8 @@ export const sendCarDelivered = ({ phone, car_number, company_name }) => {
             type: "body",
             parameters: [
                 { type: "text", text: car_number || 'Your Vehicle' },
-                { type: "text", text: timeStr }
+                { type: "text", text: timeStr },
+                { type: "text", text: company_name || 'Valet Support' }
             ]
         }
     ]);

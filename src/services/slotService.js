@@ -12,15 +12,14 @@ export const getSlotsByLocation = async (locationId) => {
 };
 
 export const createSlot = async (slotData) => {
-    const mappedData = {
+    const mapped = {
         location_id: slotData.locationId || slotData.location_id,
         slot_name: slotData.slotName || slotData.slot_name,
         sort_order: slotData.sortOrder || slotData.sort_order,
-        ...slotData
     };
     const { data, error } = await supabase
         .from('key_slots')
-        .insert(mappedData)
+        .insert(mapped)
         .select()
         .single();
     if (error) throw error;
@@ -46,9 +45,13 @@ export const deleteSlot = async (id) => {
     if (error) throw error;
 };
 
+const MAX_BULK_SLOTS = 500;
+
 export const bulkGenerateSlots = async (locationId, prefix, count, startFrom = 1) => {
+    const n = Math.max(0, Math.min(MAX_BULK_SLOTS, Math.floor(Number(count) || 0)));
+    if (n === 0) return [];
     const slots = [];
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < n; i++) {
         slots.push({
             location_id: locationId,
             slot_name: `${prefix}${startFrom + i}`,
@@ -72,6 +75,7 @@ export const clearAllSlots = async (locationId) => {
 };
 
 export const syncSlotsWithCapacity = async (locationId, targetCount) => {
+    const target = Math.max(0, Math.min(MAX_BULK_SLOTS, Math.floor(Number(targetCount) || 0)));
     const { data: existingSlots, error: fetchErr } = await supabase
         .from('key_slots')
         .select('id, sort_order')
@@ -82,9 +86,8 @@ export const syncSlotsWithCapacity = async (locationId, targetCount) => {
 
     const currentCount = existingSlots.length;
 
-    if (targetCount > currentCount) {
-        // Need to add slots
-        const toAdd = targetCount - currentCount;
+    if (target > currentCount) {
+        const toAdd = target - currentCount;
         const slotsToAdd = [];
         for (let i = 0; i < toAdd; i++) {
             slotsToAdd.push({
@@ -95,9 +98,8 @@ export const syncSlotsWithCapacity = async (locationId, targetCount) => {
         }
         const { error: insertErr } = await supabase.from('key_slots').insert(slotsToAdd);
         if (insertErr) throw insertErr;
-    } else if (targetCount < currentCount) {
-        // Need to remove slots (from the end)
-        const toRemove = currentCount - targetCount;
+    } else if (target < currentCount) {
+        const toRemove = currentCount - target;
         const idsToRemove = existingSlots.slice(-toRemove).map(s => s.id);
         const { error: deleteErr } = await supabase.from('key_slots').delete().in('id', idsToRemove);
         if (deleteErr) throw deleteErr;

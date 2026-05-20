@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { getActiveTransactions, subscribeToTransactions, updateTransactionStatus, assignDriverForRetrieval } from '../../services/transactionService';
 import { sendDriverAssigned, sendCarReady, sendCarDelivered } from '../../services/webhookService';
 import { getDriversByCompany } from '../../services/driverService';
@@ -34,7 +34,7 @@ const ActiveCars = () => {
             setTransactions(txs || []);
             setDrivers(driverList.filter(d => d.active));
         } catch (err) {
-            toast.error('Failed to load active cars');
+            toast.error(err?.message || 'Failed to load active cars');
         } finally {
             setLoading(false);
         }
@@ -82,7 +82,7 @@ const ActiveCars = () => {
             setSelectedTx(null);
             fetchData();
         } catch (err) {
-            toast.error('Failed to assign driver');
+            toast.error(err?.message || 'Failed to assign driver');
         } finally {
             setAssigning(false);
         }
@@ -95,7 +95,7 @@ const ActiveCars = () => {
             await updateTransactionStatus(id, newStatus);
             const tx = transactions.find(t => t.id === id);
 
-            if (newStatus === 'ready' && tx) {
+            if (newStatus === 'arrived' && tx) {
                 sendCarReady({
                     guest_name: tx.visitors?.name,
                     phone: tx.visitors?.phone,
@@ -126,11 +126,11 @@ const ActiveCars = () => {
     const statusCounts = {
         parked: transactions.filter(t => t.status === 'parked').length,
         requested: transactions.filter(t => t.status === 'requested').length,
-        ready: transactions.filter(t => t.status === 'ready').length,
+        ready: transactions.filter(t => t.status === 'arrived').length,
     };
 
     const sortedTransactions = [...transactions].sort((a, b) => {
-        const statusOrder = { requested: 0, parked: 1, ready: 2 };
+        const statusOrder = { requested: 0, parked: 1, arrived: 2 };
         const diff = (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
         if (diff !== 0) return diff;
         return parseUTC(a.created_at) - parseUTC(b.created_at);
@@ -217,9 +217,9 @@ const ActiveCars = () => {
                                             )}
                                             {tx.status === 'requested' && (
                                                 <Button size="sm" variant="outline" className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-[10px] py-1 h-8"
-                                                    onClick={() => handleStatusUpdate(tx.id, 'ready')}>Mark Ready</Button>
+                                                    onClick={() => handleStatusUpdate(tx.id, 'arrived')}>Mark Ready</Button>
                                             )}
-                                            {tx.status === 'ready' && (
+                                            {tx.status === 'arrived' && (
                                                 <Button size="sm" variant="ghost" onClick={() => handleStatusUpdate(tx.id, 'delivered')} className="text-[10px] py-1 h-8 hover:bg-white/5">Deliver</Button>
                                             )}
                                         </div>

@@ -13,7 +13,7 @@ export const getLocations = async () => {
 };
 
 export const createLocation = async (locationData) => {
-    const mappedData = {
+    const mapped = {
         valet_company_id: locationData.companyId || locationData.valet_company_id,
         name: locationData.name,
         address: locationData.address,
@@ -21,24 +21,23 @@ export const createLocation = async (locationData) => {
         state: locationData.state,
         country: locationData.country,
         key_capacity: locationData.keyCapacity || locationData.key_capacity,
-        ...locationData
     };
-    const { data, error } = await supabase.from('locations').insert(mappedData).select().single();
+    const { data, error } = await supabase.from('locations').insert(mapped).select().single();
     if (error) throw error;
     return data;
 };
 
 export const updateLocation = async (id, locationData) => {
-    const mappedData = {
-        name: locationData.name,
-        address: locationData.address,
-        city: locationData.city,
-        state: locationData.state,
-        country: locationData.country,
-        key_capacity: locationData.keyCapacity || locationData.key_capacity,
-        ...locationData
-    };
-    const { data, error } = await supabase.from('locations').update(mappedData).eq('id', id).select().single();
+    const mapped = {};
+    if (locationData.name !== undefined) mapped.name = locationData.name;
+    if (locationData.address !== undefined) mapped.address = locationData.address;
+    if (locationData.city !== undefined) mapped.city = locationData.city;
+    if (locationData.state !== undefined) mapped.state = locationData.state;
+    if (locationData.country !== undefined) mapped.country = locationData.country;
+    if (locationData.keyCapacity !== undefined || locationData.key_capacity !== undefined) {
+        mapped.key_capacity = locationData.keyCapacity ?? locationData.key_capacity;
+    }
+    const { data, error } = await supabase.from('locations').update(mapped).eq('id', id).select().single();
     if (error) throw error;
     return data;
 };

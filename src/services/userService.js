@@ -12,7 +12,20 @@ export const createUser = async (user) => {
     return data;
 };
 
+// Client-side role validation. RLS on the `users` table must also enforce
+// these rules — this check only catches honest UI bugs, not a determined
+// attacker bypassing the client.
+const ASSIGNABLE_ROLES = new Set(['company', 'valet', 'driver']);
+
+const assertRoleAssignable = (role) => {
+    if (role === undefined || role === null) return;
+    if (!ASSIGNABLE_ROLES.has(role)) {
+        throw new Error(`Role "${role}" cannot be assigned from the client. Use the SQL editor to promote admins.`);
+    }
+};
+
 export const updateUserRole = async (id, role) => {
+    assertRoleAssignable(role);
     const { data, error } = await supabase.from('users').update({ role }).eq('id', id).select().single();
     if (error) throw error;
     return data;
@@ -45,7 +58,17 @@ export const createStaff = async (userData) => {
 };
 
 export const updateUser = async (id, updates) => {
-    const { data, error } = await supabase.from('users').update(updates).eq('id', id).select().single();
+    // Whitelist fields. Without this, a caller could pass arbitrary keys
+    // (including `valet_company_id`) and reassign users to other companies.
+    const allowed = {};
+    if (updates.name !== undefined) allowed.name = updates.name;
+    if (updates.email !== undefined) allowed.email = updates.email;
+    if (updates.location_id !== undefined) allowed.location_id = updates.location_id;
+    if (updates.role !== undefined) {
+        assertRoleAssignable(updates.role);
+        allowed.role = updates.role;
+    }
+    const { data, error } = await supabase.from('users').update(allowed).eq('id', id).select().single();
     if (error) throw error;
     return data;
 };

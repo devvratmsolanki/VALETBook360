@@ -18,6 +18,8 @@ interface SendRequest {
 // @ts-ignore Deno is available in Supabase Edge Functions
 const _Deno = (globalThis as any).Deno;
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -29,6 +31,9 @@ const YETI_PHONE_ID = _Deno.env.get("YETI_PHONE_NUMBER_ID") || "";
 const YETI_WABA_ID = _Deno.env.get("YETI_WABA_ID") || "";
 const YETI_API_URL = `https://crm.yeti.marketing/api/meta/v19.0/${YETI_PHONE_ID}/messages`;
 const YETI_AUTH_URL = "https://crm.yeti.marketing/api/v2/auth/api-token";
+
+const SUPABASE_URL = _Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_KEY = _Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 // In-memory JWT cache (lives for the duration of the edge function instance)
 let cachedJwt: string | null = null;
@@ -150,6 +155,38 @@ _Deno.serve(async (req: Request) => {
     }
 
     try {
+        // The anon key is public (bundled into the frontend JS), so requiring
+        // just `Authorization: Bearer <anon>` would not actually authenticate
+        // anything — anyone could spam WhatsApp messages through this endpoint.
+        // Verify the caller's JWT and that they have a profile row.
+        const authHeader = req.headers.get("Authorization") || "";
+        const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+        if (!jwt || jwt === _Deno.env.get("SUPABASE_ANON_KEY")) {
+            return new Response(
+                JSON.stringify({ error: "Authentication required" }),
+                { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+        const { data: { user }, error: authError } = await supabase.auth.getUser(jwt);
+        if (authError || !user) {
+            return new Response(
+                JSON.stringify({ error: "Invalid token" }),
+                { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+        const { data: profile } = await supabase
+            .from("users")
+            .select("role")
+            .eq("id", user.id)
+            .maybeSingle();
+        if (!profile || !["admin", "company", "valet", "driver"].includes(profile.role)) {
+            return new Response(
+                JSON.stringify({ error: "Forbidden" }),
+                { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
         const { phone, templateName, components } = await req.json() as SendRequest;
 
         if (!phone || !templateName) {

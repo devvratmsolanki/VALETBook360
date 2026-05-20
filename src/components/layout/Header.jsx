@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, LogOut, User, Shield, Mail, Building2, ChevronDown, Sun, Moon } from 'lucide-react';
+import { Menu, LogOut, User, Shield, Mail, Building2, ChevronDown, Sun, Moon } from 'lucide-react';
+import NotificationsBell from './NotificationsBell';
 
 const Header = ({ onMobileMenu }) => {
     const { profile, role, signOut, user, companyName } = useAuth();
@@ -49,10 +50,7 @@ const Header = ({ onMobileMenu }) => {
                         {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                     </button>
 
-                    <button className={`relative p-2 rounded-xl transition-colors ${isDark ? 'text-gray-400 hover:text-white hover:bg-white/5' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
-                        <Bell className="h-5 w-5" />
-                        <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-brand-500 rounded-full" />
-                    </button>
+                    <NotificationsBell />
 
                     {/* User Profile Button */}
                     <div className="relative" ref={dropdownRef}>

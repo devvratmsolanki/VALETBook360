@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { updateTransactionStatus } from '../../services/transactionService';
+import { getDriverForUser } from '../../services/driverService';
 import { uploadMultiplePhotos } from '../../services/storageService';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { toast } from '../../components/ui/Toast';
+import { parseUTC } from '../../lib/utils';
 import { Car, MapPin, Key, Clock, Navigation, Check, ArrowRight, Loader2, User, Phone, RefreshCw, Camera, MessageSquare } from 'lucide-react';
 
 // ─── Live Timer ───
@@ -12,7 +14,8 @@ const LiveTimer = ({ since }) => {
     const [elapsed, setElapsed] = useState('');
     useEffect(() => {
         const calc = () => {
-            const diff = Date.now() - new Date(since).getTime();
+            const parsed = parseUTC(since);
+            const diff = parsed ? Date.now() - parsed.getTime() : 0;
             const h = Math.floor(diff / 3600000);
             const m = Math.floor((diff % 3600000) / 60000);
             setElapsed(h > 0 ? `${h}h ${m}m` : `${m}m`);
@@ -51,18 +54,23 @@ const DriverPanel = () => {
     useEffect(() => {
         const findDriver = async () => {
             if (!user || !profile) return;
-
-            let query = supabase.from('drivers').select('id, name, staff_id');
-            if (companyId) {
-                query = query.eq('valet_company_id', companyId);
+            try {
+                const driver = await getDriverForUser({
+                    userId: user.id,
+                    email: user.email,
+                    name: profile.name,
+                    companyId,
+                });
+                if (driver) {
+                    setDriverId(driver.id);
+                    setDriverName(driver.name || profile.name || 'Driver');
+                } else {
+                    setLoading(false);
+                }
+            } catch (err) {
+                console.error('Driver lookup failed:', err);
+                setLoading(false);
             }
-
-            const { data: drivers } = await query;
-            if (!drivers || drivers.length === 0) return;
-
-            const driver = drivers[0];
-            setDriverId(driver.id);
-            setDriverName(driver.name || 'Driver');
         };
         findDriver();
     }, [user, profile, companyId]);

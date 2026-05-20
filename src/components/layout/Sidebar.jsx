@@ -3,12 +3,20 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { cn } from '../../lib/utils';
 import {
-    LayoutDashboard, PlusCircle, Car, Users, Building2,
-    FileText, MapPin, MessageSquare, ClipboardList, LogOut, Shield, BarChart3
+    LayoutDashboard, Car, Users, Building2,
+    FileText, MapPin, MessageSquare, ClipboardList, LogOut, Shield, BarChart3, Settings as SettingsIcon
 } from 'lucide-react';
+
+const settingsItem = { name: 'Settings', href: '/settings', icon: SettingsIcon };
 
 const operatorNav = [
     { name: 'Dashboard', href: '/operator', icon: LayoutDashboard },
+    settingsItem,
+];
+
+const driverNav = [
+    { name: 'My Tasks', href: '/driver', icon: Car },
+    settingsItem,
 ];
 
 const companyNav = [
@@ -19,14 +27,17 @@ const companyNav = [
     { name: 'Team', href: '/company/staff', icon: Users },
     { name: 'Contracts', href: '/company/contracts', icon: FileText },
     { name: 'Analytics', href: '/company/analytics', icon: BarChart3 },
+    settingsItem,
 ];
 
 const adminNav = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Companies', href: '/admin/companies', icon: Building2 },
+    { name: 'Locations', href: '/admin/locations', icon: MapPin },
     { name: 'Users', href: '/admin/users', icon: Users },
     { name: 'Transactions', href: '/admin/transactions', icon: ClipboardList },
     { name: 'WhatsApp Logs', href: '/admin/logs', icon: MessageSquare },
+    settingsItem,
 ];
 
 const Sidebar = () => {
@@ -38,16 +49,18 @@ const Sidebar = () => {
         switch (role) {
             case 'admin': return adminNav;
             case 'company': return companyNav;
+            case 'driver': return driverNav;
             default: return operatorNav;
         }
     };
 
     const getRoleBadge = () => {
         switch (role) {
-            case 'admin': return { label: 'Admin', color: 'text-red-400' };
+            case 'admin': return { label: 'Super Admin', color: 'text-red-400' };
             case 'company': return { label: 'Company', color: 'text-blue-400' };
-            case 'valet': return { label: 'Valet', color: 'text-brand-400' };
-            default: return { label: 'Valet', color: 'text-brand-400' };
+            case 'driver': return { label: 'Driver', color: 'text-emerald-400' };
+            case 'valet': return { label: 'Operator', color: 'text-brand-400' };
+            default: return { label: 'Operator', color: 'text-brand-400' };
         }
     };
 
@@ -86,7 +99,12 @@ const Sidebar = () => {
                 <nav className="flex flex-1 flex-col">
                     <ul role="list" className="flex flex-1 flex-col gap-y-1">
                         {navigation.map((item) => {
-                            const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href + '/'));
+                            // Section root (e.g. /admin, /company) → exact match.
+                            // Deeper routes (e.g. /admin/users) → match path or nested path.
+                            const isSectionRoot = item.href.split('/').filter(Boolean).length === 1;
+                            const isActive = isSectionRoot
+                                ? location.pathname === item.href
+                                : location.pathname === item.href || location.pathname.startsWith(item.href + '/');
                             return (
                                 <li key={item.name}>
                                     <Link

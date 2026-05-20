@@ -10,7 +10,8 @@ import { toast } from '../../components/ui/Toast';
 import { formatTime, formatDate } from '../../lib/utils';
 import { MapPin, ArrowLeft, UserCheck, Car, Clock, Building2, Phone, Mail, Edit, Key, Plus, Trash2, Check, X, RefreshCw, Activity } from 'lucide-react';
 import { updateLocation } from '../../services/locationService';
-import { getSlotsByLocation, createSlot, updateSlotName, deleteSlot, bulkGenerateSlots } from '../../services/slotService';
+import { getSlotsByLocation, updateSlotName, deleteSlot, bulkGenerateSlots } from '../../services/slotService';
+import { getDriversByCompany } from '../../services/driverService';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 
@@ -36,9 +37,9 @@ const LocationDetail = () => {
         if (!locationId) return;
         const load = async () => {
             try {
-                const [locRes, drvRes, txRes, slotRes] = await Promise.all([
+                const [locRes, drvList, txRes, slotRes] = await Promise.all([
                     supabase.from('locations').select('*').eq('id', locationId).single(),
-                    supabase.from('drivers').select('*').eq('valet_company_id', companyId).order('name'),
+                    companyId ? getDriversByCompany(companyId) : Promise.resolve([]),
                     supabase.from('valet_transactions').select(`
                         *, visitors(name, phone), cars(car_number, make, model),
                         parked_driver:parked_by_driver_id(name),
@@ -49,7 +50,7 @@ const LocationDetail = () => {
                 if (locRes.error) throw locRes.error;
                 setLocation(locRes.data);
                 setEditData(locRes.data);
-                setDrivers(drvRes.data || []);
+                setDrivers((drvList || []).filter(d => !d.location_id || d.location_id === locationId));
                 setTransactions(txRes.data || []);
                 setSlots(slotRes || []);
             } catch (err) {

@@ -19,7 +19,7 @@ const DriverPerformance = () => {
                     setTransactions(await getDriverPerformanceStats(companyId));
                 }
             } catch (err) {
-                toast.error('Failed to load analytics');
+                toast.error(err?.message || 'Failed to load analytics');
             } finally {
                 setLoading(false);
             }

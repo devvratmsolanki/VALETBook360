@@ -8,10 +8,7 @@ let supabase;
 if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_supabase_url_here') {
     supabase = createClient(supabaseUrl, supabaseAnonKey, {
         auth: {
-            // Bypass navigator lock to prevent NavigatorLockAcquireTimeoutError
-            lock: async (name, acquireTimeout, fn) => {
-                return await fn();
-            },
+            storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
             persistSession: true,
             autoRefreshToken: true,
         },

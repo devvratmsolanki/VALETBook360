@@ -36,9 +36,13 @@ export const AuthProvider = ({ children }) => {
                 if (!mounted) return;
 
                 if (event === 'SIGNED_IN' && session?.user) {
+                    // Stay in loading state until profile is fetched — otherwise role
+                    // defaults to 'valet' during the gap and AuthGate routes the user
+                    // to the wrong dashboard (e.g. drivers landing on /operator).
+                    setLoading(true);
                     setUser(session.user);
                     await fetchProfile(session.user);
-                    setLoading(false);
+                    if (mounted) setLoading(false);
                 } else if (event === 'SIGNED_OUT') {
                     setUser(null);
                     setProfile(null);
@@ -60,7 +64,7 @@ export const AuthProvider = ({ children }) => {
             console.log('[Auth] Fetching profile for:', userId);
             let { data, error } = await supabase
                 .from('users')
-                .select('*, valet_companies(company_name), location:location_id(id, name)')
+                .select('*, valet_companies(company_name, phone), location:location_id(id, name)')
                 .eq('id', userId)
                 .single();
 
@@ -68,7 +72,7 @@ export const AuthProvider = ({ children }) => {
                 console.warn('[Auth] Detailed fetch failed (might be missing location_id column). Trying fallback...');
                 const { data: fallbackData, error: fallbackError } = await supabase
                     .from('users')
-                    .select('*, valet_companies(company_name)')
+                    .select('*, valet_companies(company_name, phone)')
                     .eq('id', userId)
                     .single();
 
@@ -91,16 +95,22 @@ export const AuthProvider = ({ children }) => {
 
     const autoCreateProfile = async (userId, email) => {
         try {
-            // Check if any users exist — first user becomes admin
-            const { data: existingUsers } = await supabase
+            // Check if any admin already exists — if so, this user MUST be valet.
+            // The previous "first user becomes admin" path was a TOCTOU: two concurrent
+            // signups on a fresh install could both read 0 rows and both insert as admin.
+            // We now check specifically for an existing admin row and rely on a unique
+            // constraint on (role='admin') at the DB level for true atomicity. Without
+            // that constraint, the first admin must be promoted manually via the SQL editor.
+            const { data: existingAdmins } = await supabase
                 .from('users')
                 .select('id')
+                .eq('role', 'admin')
                 .limit(1);
 
-            const isFirstUser = !existingUsers || existingUsers.length === 0;
+            const isFirstUser = !existingAdmins || existingAdmins.length === 0;
             const role = isFirstUser ? 'admin' : 'valet';
 
-            console.log('[Auth] Auto-creating profile, role:', role, '(first user:', isFirstUser, ')');
+            console.log('[Auth] Auto-creating profile, role:', role, '(first admin:', isFirstUser, ')');
 
             const { data: newProfile, error: insertError } = await supabase
                 .from('users')
@@ -115,15 +125,16 @@ export const AuthProvider = ({ children }) => {
 
             if (insertError) {
                 console.error('[Auth] Auto-create failed:', insertError.message);
-                // Fallback: set a minimal profile so routing works
-                setProfile({ id: userId, email, role, name: email.split('@')[0] });
+                // Fallback: set a minimal profile so routing works. Always default to the
+                // least-privileged role; never silently grant admin on insert failure.
+                setProfile({ id: userId, email, role: 'valet', name: email.split('@')[0] });
             } else {
                 console.log('[Auth] Profile auto-created:', newProfile);
                 setProfile(newProfile);
             }
         } catch (err) {
             console.error('[Auth] Auto-create exception:', err);
-            setProfile({ id: userId, email, role: 'admin', name: email.split('@')[0] });
+            setProfile({ id: userId, email, role: 'valet', name: email.split('@')[0] });
         }
     };
 
@@ -148,6 +159,7 @@ export const AuthProvider = ({ children }) => {
         role: profile?.role || 'valet',
         companyId: profile?.valet_company_id,
         companyName: profile?.valet_companies?.company_name || 'VALETBook360',
+        companyPhone: profile?.valet_companies?.phone || null,
         locationId: profile?.location_id,
         locationName: profile?.location?.name,
     };

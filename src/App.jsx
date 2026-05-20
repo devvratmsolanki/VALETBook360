@@ -12,6 +12,8 @@ import Locations from './pages/company/Locations';
 import Contracts from './pages/company/Contracts';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Companies from './pages/admin/Companies';
+import CompanyDetail from './pages/admin/CompanyDetail';
+import AdminLocations from './pages/admin/AdminLocations';
 import Users from './pages/admin/Users';
 import AdminTransactions from './pages/admin/AdminTransactions';
 import WhatsAppLogs from './pages/admin/WhatsAppLogs';
@@ -19,6 +21,7 @@ import DriverPerformance from './pages/company/DriverPerformance';
 import LocationDetail from './pages/company/LocationDetail';
 import Staff from './pages/company/Staff';
 import DriverPanel from './pages/driver/DriverPanel';
+import Settings from './pages/Settings';
 
 // Role mapping: database uses 'admin', 'manager', 'valet'
 // admin = super admin (full system access)
@@ -32,6 +35,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     if (allowedRoles && !allowedRoles.includes(role)) {
         if (role === 'admin') return <Navigate to="/admin" replace />;
         if (role === 'company') return <Navigate to="/company" replace />;
+        if (role === 'driver') return <Navigate to="/driver" replace />;
         return <Navigate to="/operator" replace />;
     }
     return <Layout>{children}</Layout>;
@@ -71,9 +75,13 @@ function App() {
 
                         <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
                         <Route path="/admin/companies" element={<ProtectedRoute allowedRoles={['admin']}><Companies /></ProtectedRoute>} />
+                        <Route path="/admin/companies/:id" element={<ProtectedRoute allowedRoles={['admin']}><CompanyDetail /></ProtectedRoute>} />
+                        <Route path="/admin/locations" element={<ProtectedRoute allowedRoles={['admin']}><AdminLocations /></ProtectedRoute>} />
                         <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin']}><Users /></ProtectedRoute>} />
                         <Route path="/admin/transactions" element={<ProtectedRoute allowedRoles={['admin']}><AdminTransactions /></ProtectedRoute>} />
                         <Route path="/admin/logs" element={<ProtectedRoute allowedRoles={['admin']}><WhatsAppLogs /></ProtectedRoute>} />
+
+                        <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin', 'company', 'valet', 'driver']}><Settings /></ProtectedRoute>} />
 
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getUsersByCompany, updateUser, deleteUser, createStaff } from '../../services/userService';
 import { getLocationsByCompany } from '../../services/locationService';
+import { isValidEmail, isValidPassword } from '../../lib/utils';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
@@ -33,7 +34,7 @@ const Staff = () => {
             setStaff(usersData);
             setLocations(locsData);
         } catch (err) {
-            toast.error('Failed to load team data');
+            toast.error(err?.message || 'Failed to load team data');
         } finally {
             setLoading(false);
         }
@@ -58,16 +59,21 @@ const Staff = () => {
             setEditingId(null);
             fetchData();
         } catch (err) {
-            toast.error('Failed to update staff member');
+            toast.error(err?.message || 'Failed to update staff member');
         }
     };
 
     const handleAddStaff = async (e) => {
         e.preventDefault();
+        if (!addForm.name.trim() || addForm.name.trim().length < 2) return toast.error('Name must be at least 2 characters');
+        if (!isValidEmail(addForm.email)) return toast.error('Enter a valid email');
+        if (!isValidPassword(addForm.password)) return toast.error('Password needs 8+ chars with a letter and a number');
         setAdding(true);
         try {
             await createStaff({
                 ...addForm,
+                email: addForm.email.trim().toLowerCase(),
+                name: addForm.name.trim(),
                 company_id: companyId,
                 location_id: addForm.role === 'valet' ? (addForm.location_id || null) : null
             });
@@ -90,7 +96,7 @@ const Staff = () => {
             toast.success('Staff member removed permanently');
             fetchData();
         } catch (err) {
-            toast.error('Failed to remove staff member');
+            toast.error(err?.message || 'Failed to remove staff member');
         }
     };
 

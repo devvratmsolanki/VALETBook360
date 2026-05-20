@@ -15,14 +15,14 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import DriverSelect from '../../components/shared/DriverSelect';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
-import { searchVisitorByPhone, getVisitorByPhone, createVisitor } from '../../services/visitorService';
+import { getVisitorByPhone, createVisitor } from '../../services/visitorService';
 import { findCarByNumber, createCar } from '../../services/carService';
 import { createTransaction, getActiveTransactions, subscribeToTransactions, updateTransactionStatus, assignDriverForRetrieval, confirmKeyIn, getNextAvailableKeySlot } from '../../services/transactionService';
 import { getDriversByCompany } from '../../services/driverService';
-import { getLocationsByCompany, updateLocation } from '../../services/locationService';
-import { sendCarParked, sendDriverAssigned, sendCarReady, sendCarDelivered } from '../../services/webhookService';
+import { getLocationsByCompany } from '../../services/locationService';
+import { sendDriverAssigned, sendCarReady, sendCarDelivered } from '../../services/webhookService';
 import { uploadMultiplePhotos } from '../../services/storageService';
-import { formatTime, parseUTC } from '../../lib/utils';
+import { parseUTC } from '../../lib/utils';
 
 // ─── Live Timer Component ───
 const LiveTimer = ({ since }) => {
@@ -56,33 +56,33 @@ const tileStyles = {
 };
 
 const OperatorDashboard = () => {
-    const { companyId, companyName, locationId, locationName, role } = useAuth();
+    const { user, companyId, companyName, companyPhone, locationId, locationName, role } = useAuth();
     const isValet = role === 'valet';
+    // Key the "remembered location" by user id so it doesn't leak across
+    // operators sharing a browser. Read inside the initializer so we pick
+    // up the right scope on mount.
+    const locStorageKey = user?.id ? `vb360_last_location_${user.id}` : null;
 
     // ─── Check-in form state ───
-    const [countryCode, setCountryCode] = useState('+91');
-    const [phone, setPhone] = useState('');
     const [name, setName] = useState('');
     const [carNumber, setCarNumber] = useState('');
-    const [carMake, setCarMake] = useState('');
-    const [parkingLocation, setParkingLocation] = useState('');
     const [selectedDriver, setSelectedDriver] = useState('');
-    const [selectedLocationId, setSelectedLocationId] = useState(() => isValet ? (locationId || '') : (localStorage.getItem('vb360_last_location') || ''));
+    const [selectedLocationId, setSelectedLocationId] = useState(() => {
+        if (isValet) return locationId || '';
+        try { return locStorageKey ? (localStorage.getItem(locStorageKey) || '') : ''; }
+        catch { return ''; }
+    });
     const [loading, setLoading] = useState(false);
-    const [searchResults, setSearchResults] = useState([]);
-    const [showDropdown, setShowDropdown] = useState(false);
-    const [existingVisitor, setExistingVisitor] = useState(null);
     const [isReturning, setIsReturning] = useState(false);
     const [keyCode, setKeyCode] = useState('');
     const [locationCapacity, setLocationCapacity] = useState(0);
-    const [qrModal, setQrModal] = useState(null);          // { carNumber, name, qrDataUrl, waUrl }
-    const [checkinStep, setCheckinStep] = useState(1);     // 1: Guest Info, 2: Vehicle Processing
+    const [qrModal, setQrModal] = useState(null);
+    const [checkinStep, setCheckinStep] = useState(1);
     const [currentTxId, setCurrentTxId] = useState(null);
-    const [checkinPhotos, setCheckinPhotos] = useState([]);      // preview blob URLs
-    const [checkinPhotoFiles, setCheckinPhotoFiles] = useState([]); // actual File objects
-    const dropdownRef = useRef(null);
-    const fileInputRef = useRef(null);
+    const [checkinPhotos, setCheckinPhotos] = useState([]);
+    const [checkinPhotoFiles, setCheckinPhotoFiles] = useState([]);
     const photoInputRef = useRef(null);
+    const carLookupTimerRef = useRef(null);
 
     // ─── Right panel state ───
     const [transactions, setTransactions] = useState([]);
@@ -139,41 +139,6 @@ const OperatorDashboard = () => {
         return () => { sub.unsubscribe(); clearInterval(heartbeat); };
     }, [fetchAll]);
 
-    // ─── Phone search ───
-    useEffect(() => {
-        const digits = phone.replace(/\D/g, '');
-        if (digits.length < 7) { setSearchResults([]); setShowDropdown(false); return; }
-        const fullPhone = countryCode + digits;
-        const t = setTimeout(async () => {
-            try {
-                const r = await searchVisitorByPhone(fullPhone);
-                setSearchResults(r);
-                setShowDropdown(r.length > 0);
-            } catch (err) {
-                console.error('[Supabase Search Error]', err);
-            }
-        }, 300);
-        return () => clearTimeout(t);
-    }, [phone, countryCode]);
-
-    useEffect(() => {
-        const h = (e) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setShowDropdown(false); };
-        document.addEventListener('mousedown', h);
-        return () => document.removeEventListener('mousedown', h);
-    }, []);
-
-    const selectVisitor = async (v) => {
-        setPhone(v.phone); setName(v.name); setExistingVisitor(v); setIsReturning(true); setShowDropdown(false);
-        try {
-            const full = await getVisitorByPhone(v.phone);
-            if (full?.cars?.length > 0) {
-                const c = full.cars[full.cars.length - 1];
-                setCarNumber(c.car_number || '');
-                setCarMake(`${c.make || ''} ${c.model || ''}`.trim());
-            }
-        } catch { }
-    };
-
     useEffect(() => {
         if (isValet && locationId) {
             setSelectedLocationId(locationId);
@@ -186,7 +151,9 @@ const OperatorDashboard = () => {
     const handleLocationChange = async (val) => {
         setSelectedLocationId(val);
         if (val) {
-            if (!isValet) localStorage.setItem('vb360_last_location', val);
+            if (!isValet && locStorageKey) {
+                try { localStorage.setItem(locStorageKey, val); } catch { /* quota */ }
+            }
             try {
                 const loc = locations.find(l => l.id === val);
                 if (loc) setLocationCapacity(loc.key_capacity || 0);
@@ -211,7 +178,11 @@ const OperatorDashboard = () => {
         try {
             const cleanCar = carNum.replace(/\s/g, '');
             const waMessage = encodeURIComponent(`Hi, I am ${guestName.trim()}, I have given you my car ${cleanCar}`);
-            const waUrl = `https://wa.me/919106597391?text=${waMessage}`;
+            // Per-company WhatsApp number from company profile, with fallback to a
+            // build-time env var, then a last-resort hardcoded default.
+            const fallbackNumber = import.meta.env.VITE_DEFAULT_WHATSAPP_NUMBER || '919106597391';
+            const waNumber = (companyPhone || fallbackNumber).replace(/\D/g, '');
+            const waUrl = `https://wa.me/${waNumber}?text=${waMessage}`;
             const qrDataUrl = await QRCode.toDataURL(waUrl, {
                 width: 256,
                 margin: 2,
@@ -338,10 +309,12 @@ const OperatorDashboard = () => {
         if (!assignDriverId) return toast.error('Select a driver');
         setAssigning(true);
         try {
-            await assignDriverForRetrieval(selectedTx.id, assignDriverId, etaMinutes);
-            if (pickupLocation) {
-                await updateTransactionStatus(selectedTx.id, 'driver_assigned', { pickup_location: pickupLocation });
-            }
+            await assignDriverForRetrieval(
+                selectedTx.id,
+                assignDriverId,
+                etaMinutes,
+                pickupLocation ? { pickup_location: pickupLocation } : {},
+            );
             const d = drivers.find(dr => dr.id === assignDriverId);
             const loc = locations.find(l => l.id === selectedTx.location_id);
             sendDriverAssigned({
@@ -417,7 +390,6 @@ const OperatorDashboard = () => {
         };
     }, [transactions]);
 
-    const driverOptions = [{ value: '', label: 'Select driver... *' }, ...drivers.map(d => ({ value: d.id, label: d.name }))];
     const locationOptions = [{ value: '', label: 'Select location...' }, ...locations.map(l => ({ value: l.id, label: l.name }))];
 
     // ─── Render a single car tile ───
@@ -593,8 +565,8 @@ const OperatorDashboard = () => {
                                             setCarNumber(val);
                                             setIsReturning(false);
                                             if (val.length >= 4) {
-                                                clearTimeout(window._carLookupTimer);
-                                                window._carLookupTimer = setTimeout(async () => {
+                                                clearTimeout(carLookupTimerRef.current);
+                                                carLookupTimerRef.current = setTimeout(async () => {
                                                     try {
                                                         const car = await findCarByNumber(val);
                                                         if (car?.visitors?.name) {

@@ -4,8 +4,8 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import { toast } from '../../components/ui/Toast';
-import { Search, Filter, Download, Car, Calendar, Clock, MapPin, User, ArrowRight } from 'lucide-react';
-import { formatTime, parseUTC } from '../../lib/utils';
+import { Search, Filter, Download, Car, Calendar, Clock, MapPin, User, ArrowRight, Activity, CheckCircle } from 'lucide-react';
+import { formatTime, formatDate } from '../../lib/utils';
 
 const AdminTransactions = () => {
     const [transactions, setTransactions] = useState([]);
@@ -162,8 +162,8 @@ const AdminTransactions = () => {
                                     <td className="px-6 py-4"><Badge className={statusStyles[t.status] || ''}>{t.status}</Badge></td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex flex-col items-end">
-                                            <div className="flex items-center gap-1 text-gray-300 text-xs font-mono"><Clock className="h-3 w-3 text-gray-600" /> {formatTime(parseUTC(t.created_at))}</div>
-                                            <p className="text-[10px] text-gray-600 mt-0.5">{new Date(t.created_at).toLocaleDateString()}</p>
+                                            <div className="flex items-center gap-1 text-gray-300 text-xs font-mono"><Clock className="h-3 w-3 text-gray-600" /> {formatTime(t.created_at)}</div>
+                                            <p className="text-[10px] text-gray-600 mt-0.5">{formatDate(t.created_at)}</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -177,5 +177,3 @@ const AdminTransactions = () => {
 };
 
 export default AdminTransactions;
-
-import { Activity, CheckCircle } from 'lucide-react';
