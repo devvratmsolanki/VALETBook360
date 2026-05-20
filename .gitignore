@@ -25,3 +25,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code workspace state (local only)
+.claude/
+
+# Supabase CLI scratch state (local only)
+supabase/.temp/
