@@ -60,13 +60,20 @@ public class CompanyAdminService {
     private final CompanyRepository companies;
     private final LocationRepository locations;
     private final UserRepository users;
+    private final com.valet.auth.repository.KeySlotRepository keySlots;
     private final PasswordEncoder passwordEncoder;
 
+    /** Upper bound on a single bulk key-slot generation (legacy MAX_BULK_SLOTS). */
+    private static final int MAX_BULK_SLOTS = 500;
+
     public CompanyAdminService(CompanyRepository companies, LocationRepository locations,
-                               UserRepository users, PasswordEncoder passwordEncoder) {
+                               UserRepository users,
+                               com.valet.auth.repository.KeySlotRepository keySlots,
+                               PasswordEncoder passwordEncoder) {
         this.companies = companies;
         this.locations = locations;
         this.users = users;
+        this.keySlots = keySlots;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -218,6 +225,82 @@ public class CompanyAdminService {
         return locations.findAllByOrderByNameAsc().stream()
                 .map(l -> LocationResponse.from(l, names.get(l.getCompanyId())))
                 .toList();
+    }
+
+    // =====================================================================
+    //  Key slots (Location Detail → Key Slots tab)
+    // =====================================================================
+
+    /** All custom key slots for a location. Admin → any; manager → own only. */
+    @Transactional(readOnly = true)
+    public List<com.valet.auth.dto.KeySlotResponse> listSlots(AuthPrincipal caller,
+                                                              UUID locationId) {
+        authorizeLocation(caller, locationId);
+        return keySlots.findByLocationIdOrderBySortOrderAscSlotNameAsc(locationId)
+                .stream().map(com.valet.auth.dto.KeySlotResponse::from).toList();
+    }
+
+    /**
+     * Bulk-generate slots named {@code <prefix><startFrom + i>} for i in
+     * [0, count). Mirrors the legacy generator: count is clamped to [0, 500];
+     * each slot's {@code sortOrder} is {@code startFrom + i} so display order
+     * follows the sequence. Admin → any; manager → own only.
+     */
+    @Transactional
+    public List<com.valet.auth.dto.KeySlotResponse> bulkGenerateSlots(
+            AuthPrincipal caller, UUID locationId,
+            com.valet.auth.dto.BulkGenerateSlotsRequest req) {
+        authorizeLocation(caller, locationId);
+
+        int count = Math.max(0, Math.min(MAX_BULK_SLOTS, req.count()));
+        if (count == 0) {
+            return List.of();
+        }
+        String prefix = req.prefix() == null ? "" : req.prefix().trim();
+        int start = Math.max(0, req.startFrom());
+
+        List<com.valet.auth.domain.KeySlot> toSave = new java.util.ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            int seq = start + i;
+            toSave.add(new com.valet.auth.domain.KeySlot(
+                    UUID.randomUUID(), locationId, prefix + seq, seq));
+        }
+        return keySlots.saveAll(toSave).stream()
+                .map(com.valet.auth.dto.KeySlotResponse::from).toList();
+    }
+
+    /** Rename one slot. Authorized against the slot's location's company. */
+    @Transactional
+    public com.valet.auth.dto.KeySlotResponse renameSlot(AuthPrincipal caller, UUID slotId,
+                                                         String slotName) {
+        com.valet.auth.domain.KeySlot slot = loadSlotAuthorized(caller, slotId);
+        slot.setSlotName(slotName.trim());
+        keySlots.save(slot);
+        return com.valet.auth.dto.KeySlotResponse.from(slot);
+    }
+
+    /** Delete one slot. Authorized against the slot's location's company. */
+    @Transactional
+    public void deleteSlot(AuthPrincipal caller, UUID slotId) {
+        com.valet.auth.domain.KeySlot slot = loadSlotAuthorized(caller, slotId);
+        keySlots.delete(slot);
+    }
+
+    /** Load a location, then authorize the caller against its owning company. */
+    private void authorizeLocation(AuthPrincipal caller, UUID locationId) {
+        Location loc = locations.findById(locationId)
+                .orElseThrow(() -> ServiceException.notFound("LOCATION_NOT_FOUND",
+                        "That location could not be found."));
+        loadCompanyAuthorized(caller, loc.getCompanyId());
+    }
+
+    /** Load a slot, then authorize the caller against its location's company. */
+    private com.valet.auth.domain.KeySlot loadSlotAuthorized(AuthPrincipal caller, UUID slotId) {
+        com.valet.auth.domain.KeySlot slot = keySlots.findById(slotId)
+                .orElseThrow(() -> ServiceException.notFound("SLOT_NOT_FOUND",
+                        "That key slot could not be found."));
+        authorizeLocation(caller, slot.getLocationId());
+        return slot;
     }
 
     // =====================================================================

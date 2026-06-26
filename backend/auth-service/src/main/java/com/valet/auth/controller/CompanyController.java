@@ -94,6 +94,41 @@ public class CompanyController {
         return service.updateLocation(principal(), id, req);
     }
 
+    // ------------------------------------------------------------ key slots
+
+    /** GET /api/locations/{id}/slots — custom key slots for a location. */
+    @GetMapping("/locations/{id}/slots")
+    public List<com.valet.auth.dto.KeySlotResponse> listSlots(@PathVariable("id") UUID id) {
+        return service.listSlots(principal(), id);
+    }
+
+    /**
+     * POST /api/locations/{id}/slots/bulk — bulk-generate slots
+     * ({@code <prefix><startFrom+i>}). Returns the created slots.
+     */
+    @PostMapping("/locations/{id}/slots/bulk")
+    public ResponseEntity<List<com.valet.auth.dto.KeySlotResponse>> bulkGenerateSlots(
+            @PathVariable("id") UUID id,
+            @Valid @RequestBody com.valet.auth.dto.BulkGenerateSlotsRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(service.bulkGenerateSlots(principal(), id, req));
+    }
+
+    /** PUT /api/slots/{id} — rename one slot. */
+    @PutMapping("/slots/{id}")
+    public com.valet.auth.dto.KeySlotResponse renameSlot(
+            @PathVariable("id") UUID id,
+            @Valid @RequestBody com.valet.auth.dto.RenameSlotRequest req) {
+        return service.renameSlot(principal(), id, req.slotName());
+    }
+
+    /** DELETE /api/slots/{id} — delete one slot. */
+    @org.springframework.web.bind.annotation.DeleteMapping("/slots/{id}")
+    public ResponseEntity<Void> deleteSlot(@PathVariable("id") UUID id) {
+        service.deleteSlot(principal(), id);
+        return ResponseEntity.noContent().build();
+    }
+
     // ---------------------------------------------------------- staff/users
 
     /**

@@ -106,6 +106,13 @@ class ApiConfig {
   // admin sees all companies; manager sees only their own (server-scoped).
   static const String companiesPath = '/api/companies';
   static String companyPath(String id) => '/api/companies/$id';
+
+  /// Key slots (Location Detail → Key Slots tab), served by the AUTH service.
+  static String locationSlotsPath(String locationId) =>
+      '/api/locations/$locationId/slots';
+  static String locationSlotsBulkPath(String locationId) =>
+      '/api/locations/$locationId/slots/bulk';
+  static String slotPath(String slotId) => '/api/slots/$slotId';
   static String companyLocationsPath(String id) =>
       '/api/companies/$id/locations';
   static String locationPath(String id) => '/api/locations/$id';

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
 import '../api/realtime_client.dart';
 import '../api/token_store.dart';
+import '../models/key_slot.dart';
 import '../models/transaction.dart';
 import 'admin_locations_controller.dart';
 import 'admin_users_controller.dart';
@@ -120,6 +121,14 @@ final companyDetailControllerProvider = StateNotifierProvider.family<
 final companyHistoryProvider =
     FutureProvider.autoDispose<List<Transaction>>((ref) async {
   return ref.watch(apiClientProvider).fetchTransactionHistory();
+});
+
+/// Custom key slots for one location (Location Detail → Key Slots tab), keyed by
+/// location id. `ref.invalidate(locationSlotsProvider(id))` re-pulls after a
+/// bulk-generate / rename / delete.
+final locationSlotsProvider = FutureProvider.autoDispose
+    .family<List<KeySlot>, String>((ref, locationId) async {
+  return ref.watch(apiClientProvider).fetchSlots(locationId);
 });
 
 /// All locations across every company (ADMIN only).

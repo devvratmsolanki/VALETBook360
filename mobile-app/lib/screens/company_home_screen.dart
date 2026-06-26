@@ -13,6 +13,7 @@ import '../theme/v_tokens.dart';
 import '../widgets/v_states.dart';
 import 'admin_location_create_screen.dart';
 import 'admin_staff_create_screen.dart';
+import 'location_detail_screen.dart';
 
 /// The company-owner panel — re-platforms the legacy `src/pages/company/*`
 /// surface (Dashboard, Transactions, Drivers, Locations, Team, Analytics,
@@ -605,7 +606,14 @@ class _LocationsTab extends ConsumerWidget {
         separatorBuilder: (_, __) => const SizedBox(height: VSpace.x2),
         itemBuilder: (_, i) {
           final loc = state.locations[i];
-          return _LocationRow(loc: loc, onEdit: () => edit(loc));
+          return _LocationRow(
+            loc: loc,
+            onEdit: () => edit(loc),
+            onOpen: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => LocationDetailScreen(location: loc)),
+            ),
+          );
         },
       ),
     );
@@ -613,9 +621,11 @@ class _LocationsTab extends ConsumerWidget {
 }
 
 class _LocationRow extends StatelessWidget {
-  const _LocationRow({required this.loc, required this.onEdit});
+  const _LocationRow(
+      {required this.loc, required this.onEdit, required this.onOpen});
   final AdminLocation loc;
   final VoidCallback onEdit;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -623,7 +633,7 @@ class _LocationRow extends StatelessWidget {
         .where((p) => p != null && p.isNotEmpty)
         .join(', ');
     return InkWell(
-      onTap: onEdit,
+      onTap: onOpen,
       borderRadius: BorderRadius.circular(VRadius.md),
       child: Container(
         padding: const EdgeInsets.all(VSpace.x3),
@@ -646,14 +656,18 @@ class _LocationRow extends StatelessWidget {
                           .copyWith(color: VColors.contentStrong)),
                   if (addr.isNotEmpty)
                     Text(addr, style: VType.caption),
-                  Text('${loc.keyCapacity} key slots',
+                  Text('${loc.keyCapacity} key slots · tap to manage',
                       style: VType.caption
                           .copyWith(color: VColors.contentFaint)),
                 ],
               ),
             ),
-            const Icon(Icons.edit_outlined,
-                color: VColors.contentMuted, size: 18),
+            IconButton(
+              tooltip: 'Edit location',
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined,
+                  color: VColors.contentMuted, size: 18),
+            ),
           ],
         ),
       ),

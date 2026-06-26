@@ -6,6 +6,7 @@ import '../models/assignment.dart';
 import '../models/auth_user.dart';
 import '../models/company.dart';
 import '../models/driver.dart';
+import '../models/key_slot.dart';
 import '../models/lifecycle_status.dart';
 import '../models/transaction.dart';
 import 'api_exception.dart';
@@ -202,6 +203,73 @@ class ApiClient {
         throw ApiException(message: 'Unexpected response from the server.');
       }
       return AdminLocation.fromJson(data);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  // ---- KEY SLOTS (Location Detail → Key Slots tab) ----
+
+  /// GET /api/locations/{id}/slots → custom key slots for a location.
+  Future<List<KeySlot>> fetchSlots(String locationId) async {
+    try {
+      final res = await _auth.get(ApiConfig.locationSlotsPath(locationId));
+      _ensureOk(res);
+      return _asList(res.data)
+          .whereType<Map<String, dynamic>>()
+          .map(KeySlot.fromJson)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// POST /api/locations/{id}/slots/bulk → generate `<prefix><startFrom+i>`
+  /// slots. Returns the created slots.
+  Future<List<KeySlot>> bulkGenerateSlots(
+    String locationId, {
+    required String prefix,
+    required int count,
+    required int startFrom,
+  }) async {
+    try {
+      final res = await _auth.post(
+        ApiConfig.locationSlotsBulkPath(locationId),
+        data: {'prefix': prefix, 'count': count, 'startFrom': startFrom},
+      );
+      _ensureOk(res);
+      return _asList(res.data)
+          .whereType<Map<String, dynamic>>()
+          .map(KeySlot.fromJson)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// PUT /api/slots/{id} → rename a slot.
+  Future<KeySlot> renameSlot(String slotId, String slotName) async {
+    try {
+      final res = await _auth.put(
+        ApiConfig.slotPath(slotId),
+        data: {'slotName': slotName},
+      );
+      _ensureOk(res);
+      final data = res.data;
+      if (data is! Map<String, dynamic>) {
+        throw ApiException(message: 'Unexpected response from the server.');
+      }
+      return KeySlot.fromJson(data);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// DELETE /api/slots/{id} → remove a slot.
+  Future<void> deleteSlot(String slotId) async {
+    try {
+      final res = await _auth.delete(ApiConfig.slotPath(slotId));
+      _ensureOk(res);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }
