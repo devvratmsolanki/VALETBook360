@@ -1,0 +1,167 @@
+# Vālet re-platform — local dev stack.
+# Driver vertical slice: postgres + auth-service (8081) + transaction-service (8082).
+#
+# Bring up with:   docker compose -f infra/docker-compose.yml up --build
+# Tear down + wipe: docker compose -f infra/docker-compose.yml down -v
+#
+# One Postgres cluster hosts a database per service (valet_auth, valet_core).
+# Both services share ONE HS256 secret (JWT_SECRET) so auth-issued tokens
+# validate in transaction-service. As more services land (notification, media,
+# realtime gateway, ...), add them as siblings on valet-net.
+
+name: valet
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: valet-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-valet}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-valet}
+      # auth-service DB; transaction-service's valet_core is created by initdb.
+      POSTGRES_DB: valet_auth
+    ports:
+      # Exposed for local psql / debugging; services talk over the compose network.
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Provisions valet_core on first init (see the script's note re: down -v).
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-valet} -d valet_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - valet-net
+
+  auth-service:
+    build:
+      context: ../backend/auth-service
+      dockerfile: Dockerfile
+    container_name: valet-auth-service
+    stop_grace_period: 35s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/valet_auth?stringtype=unspecified
+      DB_USER: ${DB_USER:-valet}
+      DB_PASSWORD: ${DB_PASSWORD:-valet}
+      SERVER_PORT: "8081"
+      # Redis backs the login rate-limiter + per-account lockout (cluster-safe).
+      # Container-to-container: in-network hostname + 6379.
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # Shared HS256 secret — MUST be byte-identical to transaction-service
+      # and realtime-gateway. Override in every non-local env (min 32 bytes).
+      # Generate: openssl rand -base64 48
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-32bytes-min!!}
+      AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:-valet-auth}
+      AUTH_JWT_ACCESS_TTL: ${AUTH_JWT_ACCESS_TTL:-900}
+      AUTH_JWT_REFRESH_TTL: ${AUTH_JWT_REFRESH_TTL:-2592000}
+      # Comma-separated CORS origin allowlist. Dev default: localhost any-port.
+      # Production: set to the exact Flutter/web origins in the host .env.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*}
+    ports:
+      - "${AUTH_PORT:-8081}:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health/readiness | grep -q UP || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks:
+      - valet-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: valet-redis
+    ports:
+      # Host port is NON-DEFAULT (6380) to avoid clashing with a local Redis on
+      # 6379. Container-to-container traffic always uses the in-network 6379.
+      - "${REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - valet-net
+
+  transaction-service:
+    build:
+      context: ../backend/transaction-service
+      dockerfile: Dockerfile
+    container_name: valet-transaction-service
+    stop_grace_period: 35s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/valet_core?stringtype=unspecified
+      DB_USER: ${DB_USER:-valet}
+      DB_PASSWORD: ${DB_PASSWORD:-valet}
+      SERVER_PORT: "8082"
+      # SAME shared secret as auth-service — this is what makes auth tokens
+      # validate here. If these two ever diverge, every caller gets 401.
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-32bytes-min!!}
+      # application.yml binds spring.data.redis.host/port from REDIS_HOST/REDIS_PORT.
+      # Container-to-container: always the in-network hostname + 6379.
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # Comma-separated CORS origin allowlist. Must match auth-service + gateway.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*}
+    ports:
+      - "${CORE_PORT:-8082}:8082"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health/readiness | grep -q UP || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks:
+      - valet-net
+
+  realtime-gateway:
+    build:
+      context: ../backend/realtime-gateway
+      dockerfile: Dockerfile
+    container_name: valet-realtime-gateway
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      # In-network redis; the gateway opens 3 clients (adapter pub/sub + fan-out).
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # MUST be byte-identical to auth-service + transaction-service so the JWTs
+      # they mint verify here (HS256, shared secret).
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-32bytes-min!!}
+      JWT_ISSUER: ${AUTH_JWT_ISSUER:-valet-auth}
+      GATEWAY_PORT: "8090"
+      # Comma-separated CORS origin allowlist. Must match auth-service + transaction-service.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*}
+    ports:
+      - "${GATEWAY_PORT:-8090}:8090"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/healthz | grep -q UP || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    networks:
+      - valet-net
+
+volumes:
+  pgdata:
+
+networks:
+  valet-net:
+    driver: bridge

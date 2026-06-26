@@ -1,0 +1,57 @@
+name: valet_driver_app
+description: "Vālet — Driver mission flow. Flagship Flutter slice of the Vālet Design System."
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Routing & state (per docs/design/09-flutter-implementation.md §9.1)
+  go_router: ^14.2.0
+  flutter_riverpod: ^2.5.1
+
+  # Networking — dio + interceptors (bearer attach, 401 bounce, RFC7807 parse)
+  dio: ^5.4.3+1
+
+  # Secure JWT storage
+  flutter_secure_storage: ^9.2.2
+
+  # Realtime gateway — Socket.IO 4.x (Engine.IO v4) client.
+  socket_io_client: ^2.0.3+1
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  # NOTE: Inter + JetBrains Mono are specified by the DS (doc §6.2). To keep this
+  # slice dependency-light and guaranteed-to-compile without bundling font binaries,
+  # the theme falls back to the platform sans + a monospace family and tags every
+  # mono style with fontFamilyFallback. Drop the .ttf files into assets/fonts/ and
+  # uncomment below to pin the exact brand faces.
+  #
+  # fonts:
+  #   - family: Inter
+  #     fonts:
+  #       - asset: assets/fonts/Inter-Regular.ttf
+  #       - asset: assets/fonts/Inter-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Inter-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/Inter-Bold.ttf
+  #         weight: 700
+  #   - family: JetBrains Mono
+  #     fonts:
+  #       - asset: assets/fonts/JetBrainsMono-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/JetBrainsMono-SemiBold.ttf
+  #         weight: 600

@@ -1,0 +1,45 @@
+# Production profile. Activate with: --spring.profiles.active=prod
+# (or SPRING_PROFILES_ACTIVE=prod).
+#
+# This profile REMOVES every insecure development fallback. Secrets and DB
+# credentials MUST be supplied via the environment with NO default, so a missing
+# or empty value fails LOUDLY at boot rather than silently running with a known
+# weak value. The ${VAR} forms below have no `:default` suffix on purpose — an
+# unset env var resolves to an empty string, which the SecretValidator (JWT) and
+# the datasource pool (DB) then reject at startup.
+#
+# Required env in prod:
+#   JWT_SECRET   - shared HS256 secret, >= 32 bytes (openssl rand -base64 48)
+#   DB_URL       - full JDBC URL, no fallback to localhost
+#   DB_USER      - no fallback to "valet"
+#   DB_PASSWORD  - no fallback to "valet"
+#   REDIS_HOST / REDIS_PORT - login-guard backing store
+
+spring:
+  datasource:
+    # No localhost fallback. A missing DB_URL aborts boot.
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+auth:
+  jwt:
+    # No empty fallback. A missing/blank/weak JWT_SECRET aborts boot via
+    # SecretValidator (and JwtService's own >=32-byte guard).
+    secret: ${JWT_SECRET}
+
+server:
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+# Tighten actuator exposure in prod: health + info only, never details.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never

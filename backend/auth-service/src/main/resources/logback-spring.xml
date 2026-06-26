@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logging config for auth-service.
+
+  Every log line carries the per-request correlation id via [%X{requestId}],
+  pulled from the SLF4J MDC that RequestIdFilter populates. A line emitted
+  outside any request (startup, scheduled work) shows an empty id "[]".
+
+  Dev/default profile: a human-readable single line. The "prod" profile emits a
+  compact key=value line (still grep-able, still carries requestId) so it ships
+  cleanly to an aggregator without a JSON encoder dependency.
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProfile name="prod">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>ts=%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} level=%-5level requestId=%X{requestId:-} logger=%logger{40} msg=%replace(%msg){'[\r\n]+', ' '}%n%wEx</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <springProfile name="!prod">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-}] %logger{36} - %msg%n%wEx</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

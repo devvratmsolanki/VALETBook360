@@ -305,13 +305,24 @@ const UserTable = ({ users, currentUserId, onRoleChange, onDelete }) => (
                                 <Badge className={ROLE_STYLE[u.role] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}>
                                     {ROLE_LABEL[u.role] || u.role}
                                 </Badge>
-                                <select
-                                    value={u.role}
-                                    onChange={(e) => onRoleChange(u.id, e.target.value)}
-                                    className="bg-dark-600 text-gray-300 text-[11px] px-2 py-1 rounded-md ring-1 ring-white/5 focus:ring-brand-500/50 cursor-pointer"
-                                >
-                                    {ROLE_ORDER.map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
-                                </select>
+                                {/* Super admin role is locked from the UI for two reasons:
+                                    1. A logged-in admin must not be able to demote themselves.
+                                    2. Other super admins can only be promoted/demoted via SQL,
+                                       to keep the admin tier outside the blast radius of a
+                                       compromised admin session or a UI bug. */}
+                                {(u.id === currentUserId || u.role === 'admin') ? (
+                                    <span className="text-[10px] text-gray-600 italic" title={u.role === 'admin' ? 'Super admin role can only be changed via SQL' : "You can't change your own role"}>
+                                        locked
+                                    </span>
+                                ) : (
+                                    <select
+                                        value={u.role}
+                                        onChange={(e) => onRoleChange(u.id, e.target.value)}
+                                        className="bg-dark-600 text-gray-300 text-[11px] px-2 py-1 rounded-md ring-1 ring-white/5 focus:ring-brand-500/50 cursor-pointer"
+                                    >
+                                        {ROLE_ORDER.map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+                                    </select>
+                                )}
                             </div>
                         </td>
                         <td className="px-5 py-3 text-right">

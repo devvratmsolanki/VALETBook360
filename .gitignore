@@ -31,3 +31,19 @@ dist-ssr
 
 # Supabase CLI scratch state (local only)
 supabase/.temp/
+
+# Java / Maven build artifacts
+**/target/
+*.class
+# Stray compiled output accidentally written to service roots
+backend/*/com/
+backend/*/org/
+backend/*/META-INF/
+
+# Flutter/Dart build artifacts (also covered by nested .gitignore files)
+**/.dart_tool/
+**/build/
+*.iml
+
+# Infra env (already covered by .env, listed for clarity — never commit secrets)
+infra/.env

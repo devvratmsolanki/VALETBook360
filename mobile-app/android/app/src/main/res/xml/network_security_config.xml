@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Permit cleartext HTTP ONLY to the local-development loopback hosts so the
+  emulator/device can reach the AUTH (8081) and CORE (8082) backends during dev.
+  Everything else stays HTTPS-only. Tighten/remove for production builds.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>   <!-- Android emulator → host -->
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">localhost</domain>
+    </domain-config>
+</network-security-config>

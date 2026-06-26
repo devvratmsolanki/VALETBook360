@@ -167,8 +167,23 @@ export const confirmKeyIn = async (id) => {
  * Assign driver for retrieval — sets driver_assigned status.
  * extras may include pickup_location so it lands in the same write and
  * Realtime subscribers don't briefly see a driver_assigned record without it.
+ *
+ * Auto-steps through `requested` when the operator assigns a driver from
+ * `parked` or `key_in` (the dashboard flow has no separate "guest requested"
+ * button — the assign action implies the request happened).
  */
 export const assignDriverForRetrieval = async (id, driverId, etaMinutes = 8, extras = {}) => {
+    const { data: current, error: fetchErr } = await supabase
+        .from('valet_transactions')
+        .select('status')
+        .eq('id', id)
+        .single();
+    if (fetchErr) throw fetchErr;
+
+    if (current.status === 'parked' || current.status === 'key_in') {
+        await updateTransactionStatus(id, 'requested');
+    }
+
     const estimatedTime = new Date(Date.now() + etaMinutes * 60 * 1000).toISOString();
     return updateTransactionStatus(id, 'driver_assigned', {
         retrieved_by_driver_id: driverId,

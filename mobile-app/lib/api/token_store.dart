@@ -1,0 +1,88 @@
+import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../models/auth_user.dart';
+
+/// Secure persistence for the JWT pair + cached user (doc §9.1:
+/// flutter_secure_storage for tokens). Session is intentionally NOT in plain
+/// shared-prefs — mirrors the web app keeping auth out of localStorage.
+class TokenStore {
+  TokenStore([FlutterSecureStorage? storage])
+      : _storage = storage ??
+            const FlutterSecureStorage(
+              aOptions: AndroidOptions(encryptedSharedPreferences: true),
+              iOptions: IOSOptions(
+                accessibility: KeychainAccessibility.first_unlock,
+              ),
+            );
+
+  final FlutterSecureStorage _storage;
+
+  static const _kAccess = 'valet.accessToken';
+  static const _kRefresh = 'valet.refreshToken';
+  static const _kUser = 'valet.user';
+
+  /// In-memory mirror of the session, populated on [save] and lazily on the
+  /// first read. The HTTP bearer interceptor and the realtime connect both hit
+  /// [accessToken] on every request; on web `flutter_secure_storage` reads can
+  /// stall (SubtleCrypto / storage quirks), which would hang every API call
+  /// behind the interceptor. Serving the hot path from memory makes auth
+  /// reads instant and immune to that, while storage stays the source of
+  /// truth across reloads.
+  String? _accessCache;
+  String? _refreshCache;
+  AuthUser? _userCache;
+
+  /// Hard ceiling on any secure-storage read so a stalled web read can never
+  /// hang the app — we fall back to the in-memory value (or null) instead.
+  static const _readTimeout = Duration(seconds: 3);
+
+  Future<String?> _read(String key) async {
+    try {
+      return await _storage.read(key: key).timeout(_readTimeout);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> save(AuthSession session) async {
+    // Memory first so the very next request is authenticated even if the
+    // (awaited) writes below are slow on web.
+    _accessCache = session.accessToken;
+    _refreshCache = session.refreshToken;
+    _userCache = session.user;
+    await Future.wait([
+      _storage.write(key: _kAccess, value: session.accessToken),
+      _storage.write(key: _kRefresh, value: session.refreshToken),
+      _storage.write(key: _kUser, value: jsonEncode(session.user.toJson())),
+    ]);
+  }
+
+  Future<String?> get accessToken async =>
+      _accessCache ??= await _read(_kAccess);
+
+  Future<String?> get refreshToken async =>
+      _refreshCache ??= await _read(_kRefresh);
+
+  Future<AuthUser?> readUser() async {
+    if (_userCache != null) return _userCache;
+    final raw = await _read(_kUser);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return _userCache =
+          AuthUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> clear() async {
+    _accessCache = null;
+    _refreshCache = null;
+    _userCache = null;
+    await Future.wait([
+      _storage.delete(key: _kAccess),
+      _storage.delete(key: _kRefresh),
+      _storage.delete(key: _kUser),
+    ]);
+  }
+}

@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: transaction-service
+
+  datasource:
+    # stringtype=unspecified lets PostgreSQL coerce the JPA enum's string value
+    # into the native valet_status enum without a custom Hibernate UserType.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/valet_core?stringtype=unspecified}
+    username: ${DB_USER:valet}
+    password: ${DB_PASSWORD:valet}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: 2
+      connection-timeout: 10000
+
+  jpa:
+    hibernate:
+      # Flyway owns the schema. Never let Hibernate mutate it.
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  # Realtime delta fan-out target. Publishing is best-effort: a Redis outage is
+  # caught + logged and never fails the transaction or the HTTP request. Lettuce
+  # connects lazily, so the service still boots if Redis is unreachable.
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+server:
+  port: ${SERVER_PORT:8082}
+  shutdown: graceful
+  error:
+    # Never expose stack traces or internal messages via the default error page.
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+valet:
+  jwt:
+    # SAME shared HS256 secret as the auth-service (which reads AUTH_JWT_SECRET).
+    # We accept JWT_SECRET per the cross-service contract; AUTH_JWT_SECRET is a
+    # fallback so a single compose .env value works for both services.
+    secret: ${JWT_SECRET:${AUTH_JWT_SECRET:}}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
