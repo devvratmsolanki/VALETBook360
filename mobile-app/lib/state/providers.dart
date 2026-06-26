@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
 import '../api/realtime_client.dart';
 import '../api/token_store.dart';
+import '../models/contract.dart';
 import '../models/key_slot.dart';
 import '../models/transaction.dart';
 import 'admin_locations_controller.dart';
@@ -129,6 +130,13 @@ final companyHistoryProvider =
 final locationSlotsProvider = FutureProvider.autoDispose
     .family<List<KeySlot>, String>((ref, locationId) async {
   return ref.watch(apiClientProvider).fetchSlots(locationId);
+});
+
+/// Contracts for one company (company panel → Contracts tab), keyed by company
+/// id. `ref.invalidate(companyContractsProvider(id))` re-pulls after a create.
+final companyContractsProvider = FutureProvider.autoDispose
+    .family<List<Contract>, String>((ref, companyId) async {
+  return ref.watch(apiClientProvider).fetchContracts(companyId);
 });
 
 /// All locations across every company (ADMIN only).

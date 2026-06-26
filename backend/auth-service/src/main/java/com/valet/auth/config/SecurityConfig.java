@@ -74,7 +74,7 @@ public class SecurityConfig {
                         // Per-tenant scoping (a manager only their own company) and
                         // the admin-only POST /api/companies are enforced in-service.
                         .requestMatchers("/api/companies/**", "/api/locations/**",
-                                "/api/slots/**")
+                                "/api/slots/**", "/api/users/**")
                                 .hasAnyRole("ADMIN", "MANAGER")
                         // Everything else (register, me, logout) requires a valid token.
                         // Fine-grained role checks (admin/manager only on register) live

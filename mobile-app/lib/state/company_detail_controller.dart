@@ -167,4 +167,45 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
       return false;
     }
   }
+
+  /// Activate/deactivate a staff (operator/driver) account and refresh both
+  /// people slices (the user could be in either). Returns true on success.
+  Future<bool> setUserActive(String userId, bool active, {required bool isDriver}) async {
+    createError = null;
+    try {
+      await _client.setUserActive(userId, active);
+      if (isDriver) {
+        await _refreshDrivers();
+      } else {
+        await _refreshOperators();
+      }
+      return true;
+    } on ApiException catch (e) {
+      createError = e.message;
+      return false;
+    } catch (_) {
+      createError = 'Could not update the account. Please try again.';
+      return false;
+    }
+  }
+
+  /// Delete a staff (operator/driver) account and refresh that slice.
+  Future<bool> deleteUser(String userId, {required bool isDriver}) async {
+    createError = null;
+    try {
+      await _client.deleteUser(userId);
+      if (isDriver) {
+        await _refreshDrivers();
+      } else {
+        await _refreshOperators();
+      }
+      return true;
+    } on ApiException catch (e) {
+      createError = e.message;
+      return false;
+    } catch (_) {
+      createError = 'Could not delete the account. Please try again.';
+      return false;
+    }
+  }
 }

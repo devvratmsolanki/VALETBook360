@@ -61,6 +61,7 @@ public class CompanyAdminService {
     private final LocationRepository locations;
     private final UserRepository users;
     private final com.valet.auth.repository.KeySlotRepository keySlots;
+    private final com.valet.auth.repository.ContractRepository contracts;
     private final PasswordEncoder passwordEncoder;
 
     /** Upper bound on a single bulk key-slot generation (legacy MAX_BULK_SLOTS). */
@@ -69,11 +70,13 @@ public class CompanyAdminService {
     public CompanyAdminService(CompanyRepository companies, LocationRepository locations,
                                UserRepository users,
                                com.valet.auth.repository.KeySlotRepository keySlots,
+                               com.valet.auth.repository.ContractRepository contracts,
                                PasswordEncoder passwordEncoder) {
         this.companies = companies;
         this.locations = locations;
         this.users = users;
         this.keySlots = keySlots;
+        this.contracts = contracts;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -301,6 +304,111 @@ public class CompanyAdminService {
                         "That key slot could not be found."));
         authorizeLocation(caller, slot.getLocationId());
         return slot;
+    }
+
+    // =====================================================================
+    //  Contracts (company panel → Contracts tab)
+    // =====================================================================
+
+    /** Contracts for a company, newest first, enriched with location info. */
+    @Transactional(readOnly = true)
+    public List<com.valet.auth.dto.ContractResponse> listContracts(AuthPrincipal caller,
+                                                                   UUID companyId) {
+        loadCompanyAuthorized(caller, companyId);
+        Map<UUID, Location> locIndex = locations.findByCompanyIdOrderByNameAsc(companyId)
+                .stream().collect(java.util.stream.Collectors.toMap(Location::getId, l -> l));
+        return contracts.findByCompanyIdOrderByCreatedAtDesc(companyId).stream()
+                .map(c -> {
+                    Location l = c.getLocationId() == null ? null : locIndex.get(c.getLocationId());
+                    return com.valet.auth.dto.ContractResponse.from(c,
+                            l == null ? null : l.getName(),
+                            l == null ? null : l.getCity(),
+                            l == null ? null : l.getState());
+                })
+                .toList();
+    }
+
+    /** Create a contract under a company. Admin → any; manager → own only. */
+    @Transactional
+    public com.valet.auth.dto.ContractResponse createContract(AuthPrincipal caller,
+            UUID companyId, com.valet.auth.dto.CreateContractRequest req) {
+        loadCompanyAuthorized(caller, companyId);
+        // If a location is supplied, it must belong to THIS company.
+        if (req.locationId() != null) {
+            Location loc = locations.findById(req.locationId())
+                    .orElseThrow(() -> ServiceException.notFound("LOCATION_NOT_FOUND",
+                            "That location could not be found."));
+            if (!companyId.equals(loc.getCompanyId())) {
+                throw ServiceException.forbidden("CROSS_TENANT",
+                        "That location belongs to another company.");
+            }
+        }
+        com.valet.auth.domain.Contract c = new com.valet.auth.domain.Contract(
+                UUID.randomUUID(), companyId, req.locationId(), req.name().trim(),
+                trimToNull(req.type()), trimToNull(req.status()),
+                req.active() == null || req.active(),
+                trimToNull(req.managerName()), trimToNull(req.managerPhone()),
+                trimToNull(req.managerEmail()));
+        contracts.save(c);
+        Location l = req.locationId() == null ? null
+                : locations.findById(req.locationId()).orElse(null);
+        return com.valet.auth.dto.ContractResponse.from(c,
+                l == null ? null : l.getName(),
+                l == null ? null : l.getCity(),
+                l == null ? null : l.getState());
+    }
+
+    // =====================================================================
+    //  User lifecycle (activate / deactivate / delete) — company panel
+    // =====================================================================
+
+    /**
+     * Toggle a user's active flag. Authorized against the user's own company.
+     * Only {@code valet}/{@code driver} accounts may be toggled here (a manager
+     * cannot disable another manager/admin).
+     */
+    @Transactional
+    public AdminUserResponse setUserActive(AuthPrincipal caller, UUID userId, boolean active) {
+        User u = loadStaffUserAuthorized(caller, userId);
+        u.setActive(active);
+        users.save(u);
+        return AdminUserResponse.from(u);
+    }
+
+    /**
+     * Delete a {@code valet}/{@code driver} user. Authorized against the user's
+     * company; managers/admins cannot be deleted here, nor can the caller delete
+     * themselves. Historical transaction rows in the (separate) core DB keep the
+     * now-dangling driver id as audit data — there is no cross-DB FK to break.
+     */
+    @Transactional
+    public void deleteUser(AuthPrincipal caller, UUID userId) {
+        User u = loadStaffUserAuthorized(caller, userId);
+        if (userId.equals(caller.userId())) {
+            throw ServiceException.conflict("CANNOT_DELETE_SELF",
+                    "You can't delete your own account.");
+        }
+        users.delete(u);
+    }
+
+    /**
+     * Load a user, assert they belong to a company the caller may manage, and
+     * that they are a staff account (valet/driver) — never a manager/admin.
+     */
+    private User loadStaffUserAuthorized(AuthPrincipal caller, UUID userId) {
+        User u = users.findById(userId)
+                .orElseThrow(() -> ServiceException.notFound("USER_NOT_FOUND",
+                        "That user could not be found."));
+        if (u.getCompanyId() == null) {
+            throw ServiceException.forbidden("CROSS_TENANT",
+                    "That user is not part of a manageable company.");
+        }
+        loadCompanyAuthorized(caller, u.getCompanyId());
+        if (u.getRole() != Role.VALET && u.getRole() != Role.DRIVER) {
+            throw ServiceException.forbidden("PROTECTED_ACCOUNT",
+                    "Only operator and driver accounts can be changed here.");
+        }
+        return u;
     }
 
     // =====================================================================

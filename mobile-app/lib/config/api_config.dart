@@ -107,6 +107,14 @@ class ApiConfig {
   static const String companiesPath = '/api/companies';
   static String companyPath(String id) => '/api/companies/$id';
 
+  /// Contracts (company panel → Contracts tab).
+  static String companyContractsPath(String companyId) =>
+      '/api/companies/$companyId/contracts';
+
+  /// User lifecycle (activate/deactivate, delete) — company panel.
+  static String userActivePath(String userId) => '/api/users/$userId/active';
+  static String userPath(String userId) => '/api/users/$userId';
+
   /// Key slots (Location Detail → Key Slots tab), served by the AUTH service.
   static String locationSlotsPath(String locationId) =>
       '/api/locations/$locationId/slots';

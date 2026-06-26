@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/admin_location.dart';
 import '../models/admin_user.dart';
+import '../models/contract.dart';
 import '../models/lifecycle_status.dart';
 import '../models/transaction.dart';
 import '../state/company_detail_controller.dart';
@@ -10,6 +11,7 @@ import '../state/providers.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../widgets/v_primary_button.dart';
 import '../widgets/v_states.dart';
 import 'admin_location_create_screen.dart';
 import 'admin_staff_create_screen.dart';
@@ -121,7 +123,7 @@ class _CompanyShell extends ConsumerWidget {
             _LocationsTab(companyId: companyId),
             _TeamTab(companyId: companyId),
             _AnalyticsTab(companyId: companyId),
-            const _ContractsTab(),
+            _ContractsTab(companyId: companyId),
           ],
         ),
       ),
@@ -484,6 +486,23 @@ class _PeopleList extends ConsumerWidget {
       );
     }
 
+    Future<void> toggle(AdminUser u) async {
+      final ok = await notifier.setUserActive(u.id, !u.active, isDriver: isDriver);
+      if (!ok && context.mounted) {
+        _snack(context, notifier.createError ?? 'Could not update the account.');
+      }
+    }
+
+    Future<void> remove(AdminUser u) async {
+      final confirmed = await _confirm(context,
+          'Delete ${u.name ?? u.email}?', 'This removes their login. This cannot be undone.');
+      if (confirmed != true) return;
+      final ok = await notifier.deleteUser(u.id, isDriver: isDriver);
+      if (!ok && context.mounted) {
+        _snack(context, notifier.createError ?? 'Could not delete the account.');
+      }
+    }
+
     return _AddScaffold(
       label: 'Add $noun',
       onAdd: add,
@@ -491,20 +510,59 @@ class _PeopleList extends ConsumerWidget {
         padding: const EdgeInsets.all(VSpace.x4),
         itemCount: people.length,
         separatorBuilder: (_, __) => const SizedBox(height: VSpace.x2),
-        itemBuilder: (_, i) => _PersonRow(user: people[i]),
+        itemBuilder: (_, i) => _PersonRow(
+          user: people[i],
+          onToggle: () => toggle(people[i]),
+          onDelete: () => remove(people[i]),
+        ),
       ),
     );
   }
 }
 
+void _snack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context)
+    ..clearSnackBars()
+    ..showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: VColors.surface700,
+      behavior: SnackBarBehavior.floating,
+    ));
+}
+
+Future<bool?> _confirm(BuildContext context, String title, String body) {
+  return showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      backgroundColor: VColors.surface900,
+      title: Text(title,
+          style: VType.body.copyWith(color: VColors.contentStrong)),
+      content: Text(body, style: VType.caption),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel',
+                style: TextStyle(color: VColors.contentMuted))),
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete',
+                style: TextStyle(color: VColors.alertDanger))),
+      ],
+    ),
+  );
+}
+
 class _PersonRow extends StatelessWidget {
-  const _PersonRow({required this.user});
+  const _PersonRow(
+      {required this.user, required this.onToggle, required this.onDelete});
   final AdminUser user;
+  final VoidCallback onToggle;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(VSpace.x3),
+      padding: const EdgeInsets.fromLTRB(VSpace.x3, VSpace.x2, VSpace.x1, VSpace.x2),
       decoration: BoxDecoration(
         color: VColors.surface900,
         borderRadius: BorderRadius.circular(VRadius.md),
@@ -540,11 +598,29 @@ class _PersonRow extends StatelessWidget {
                   .withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(VRadius.full),
             ),
-            child: Text(user.role,
+            child: Text(user.active ? 'Active' : 'Inactive',
                 style: VType.caption.copyWith(
                     color: user.active
                         ? VColors.alertSuccess
                         : VColors.contentFaint)),
+          ),
+          PopupMenuButton<String>(
+            color: VColors.surface800,
+            icon: const Icon(Icons.more_vert_rounded,
+                color: VColors.contentMuted, size: 20),
+            onSelected: (v) => v == 'toggle' ? onToggle() : onDelete(),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'toggle',
+                child: Text(user.active ? 'Deactivate' : 'Activate',
+                    style: VType.body.copyWith(color: VColors.contentStrong)),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Text('Delete',
+                    style: TextStyle(color: VColors.alertDanger)),
+              ),
+            ],
           ),
         ],
       ),
@@ -887,21 +963,265 @@ class _PerfTile extends StatelessWidget {
 }
 
 // ===========================================================================
-// 7) Contracts — list (no contracts backend yet → graceful empty state)
+// 7) Contracts — venue/client agreements (cards), with create
 // ===========================================================================
 
-class _ContractsTab extends StatelessWidget {
-  const _ContractsTab();
+class _ContractsTab extends ConsumerWidget {
+  const _ContractsTab({required this.companyId});
+  final String companyId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contracts = ref.watch(companyContractsProvider(companyId));
+
+    Future<void> add() async {
+      final created = await _AddContractSheet.show(context, ref, companyId);
+      if (created == true) {
+        ref.invalidate(companyContractsProvider(companyId));
+      }
+    }
+
+    return contracts.when(
+      loading: _loading,
+      error: (e, _) => _error('Could not load contracts.',
+          () => ref.invalidate(companyContractsProvider(companyId))),
+      data: (list) {
+        final body = list.isEmpty
+            ? VEmptyState(
+                icon: Icons.description_outlined,
+                headline: 'No contracts yet',
+                hint: 'Add your first venue or client agreement.',
+                actionLabel: 'Add contract',
+                onAction: add,
+              )
+            : ListView.separated(
+                padding: const EdgeInsets.all(VSpace.x4),
+                itemCount: list.length,
+                separatorBuilder: (_, __) => const SizedBox(height: VSpace.x2),
+                itemBuilder: (_, i) => _ContractCard(contract: list[i]),
+              );
+        return _AddScaffold(label: 'Add contract', onAdd: add, child: body);
+      },
+    );
+  }
+}
+
+class _ContractCard extends StatelessWidget {
+  const _ContractCard({required this.contract});
+  final Contract contract;
 
   @override
   Widget build(BuildContext context) {
-    return const VEmptyState(
-      icon: Icons.description_outlined,
-      headline: 'No contracts yet',
-      hint:
-          'Contract management is coming next. Your client and venue agreements will live here.',
+    final c = contract;
+    final loc = [c.locationCity, c.locationState]
+        .whereType<String>()
+        .where((p) => p.isNotEmpty)
+        .join(', ');
+    final activeColor = c.active ? VColors.alertSuccess : VColors.alertDanger;
+    return Container(
+      padding: const EdgeInsets.all(VSpace.x3),
+      decoration: BoxDecoration(
+        color: VColors.surface900,
+        borderRadius: BorderRadius.circular(VRadius.md),
+        border: Border.all(color: VColors.surface700),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.description_rounded,
+                  color: VColors.brand400, size: 18),
+              const SizedBox(width: VSpace.x2),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(c.name,
+                        style: VType.body
+                            .copyWith(color: VColors.contentStrong)),
+                    Text(
+                        [c.locationName ?? 'No location', if (loc.isNotEmpty) loc]
+                            .join(' · '),
+                        style: VType.caption),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: VSpace.x2, vertical: VSpace.x0),
+                decoration: BoxDecoration(
+                  color: activeColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(VRadius.full),
+                ),
+                child: Text(c.active ? 'Active' : 'Inactive',
+                    style: VType.caption.copyWith(
+                        color: activeColor, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+          if (c.managerName != null ||
+              c.managerPhone != null ||
+              c.managerEmail != null) ...[
+            const Divider(color: VColors.surface700, height: VSpace.x4),
+            if (c.managerName != null)
+              _line(Icons.person_outline_rounded, c.managerName!),
+            if (c.managerPhone != null)
+              _line(Icons.phone_outlined, c.managerPhone!),
+            if (c.managerEmail != null)
+              _line(Icons.mail_outline_rounded, c.managerEmail!),
+          ],
+        ],
+      ),
     );
   }
+
+  Widget _line(IconData icon, String text) => Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Row(
+          children: [
+            Icon(icon, size: 13, color: VColors.contentFaint),
+            const SizedBox(width: VSpace.x2),
+            Text(text, style: VType.caption),
+          ],
+        ),
+      );
+}
+
+/// Minimal create-contract sheet (name + optional manager contact).
+class _AddContractSheet extends ConsumerStatefulWidget {
+  const _AddContractSheet({required this.companyId});
+  final String companyId;
+
+  static Future<bool?> show(
+      BuildContext context, WidgetRef ref, String companyId) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: VColors.surface950,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(VRadius.lg)),
+      ),
+      builder: (_) => _AddContractSheet(companyId: companyId),
+    );
+  }
+
+  @override
+  ConsumerState<_AddContractSheet> createState() => _AddContractSheetState();
+}
+
+class _AddContractSheetState extends ConsumerState<_AddContractSheet> {
+  final _name = TextEditingController();
+  final _manager = TextEditingController();
+  final _phone = TextEditingController();
+  final _email = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _manager.dispose();
+    _phone.dispose();
+    _email.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_name.text.trim().isEmpty) {
+      setState(() => _error = 'Name is required.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref.read(apiClientProvider).createContract(
+            widget.companyId,
+            CreateContractInput(
+              name: _name.text.trim(),
+              managerName: _manager.text,
+              managerPhone: _phone.text,
+              managerEmail: _email.text,
+            ),
+          );
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      setState(() {
+        _busy = false;
+        _error = 'Could not create the contract. Please try again.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: VSpace.x4,
+        right: VSpace.x4,
+        top: VSpace.x4,
+        bottom: MediaQuery.of(context).viewInsets.bottom + VSpace.x4,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('New contract',
+                    style: VType.title
+                        .copyWith(color: VColors.contentStrong)),
+              ),
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                icon: const Icon(Icons.close_rounded,
+                    color: VColors.contentMuted),
+              ),
+            ],
+          ),
+          const SizedBox(height: VSpace.x3),
+          _field('Agreement name', _name),
+          const SizedBox(height: VSpace.x2),
+          _field('Manager name', _manager),
+          const SizedBox(height: VSpace.x2),
+          _field('Manager phone', _phone),
+          const SizedBox(height: VSpace.x2),
+          _field('Manager email', _email),
+          if (_error != null) ...[
+            const SizedBox(height: VSpace.x2),
+            Text(_error!,
+                style: VType.caption.copyWith(color: VColors.alertDanger)),
+          ],
+          const SizedBox(height: VSpace.x4),
+          VPrimaryButton(
+              label: 'Create contract', loading: _busy, onPressed: _submit),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(String label, TextEditingController c) => TextField(
+        controller: c,
+        style: VType.body.copyWith(color: VColors.contentStrong),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: VType.caption,
+          filled: true,
+          fillColor: VColors.surface900,
+          isDense: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(VRadius.md),
+            borderSide: const BorderSide(color: VColors.surface700),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(VRadius.md),
+            borderSide: const BorderSide(color: VColors.surface700),
+          ),
+        ),
+      );
 }
 
 // ===========================================================================

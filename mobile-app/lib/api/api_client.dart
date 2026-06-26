@@ -5,6 +5,7 @@ import '../models/admin_user.dart';
 import '../models/assignment.dart';
 import '../models/auth_user.dart';
 import '../models/company.dart';
+import '../models/contract.dart';
 import '../models/driver.dart';
 import '../models/key_slot.dart';
 import '../models/lifecycle_status.dart';
@@ -203,6 +204,71 @@ class ApiClient {
         throw ApiException(message: 'Unexpected response from the server.');
       }
       return AdminLocation.fromJson(data);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  // ---- CONTRACTS (company panel → Contracts tab) ----
+
+  /// GET /api/companies/{id}/contracts → contracts for a company, newest first.
+  Future<List<Contract>> fetchContracts(String companyId) async {
+    try {
+      final res = await _auth.get(ApiConfig.companyContractsPath(companyId));
+      _ensureOk(res);
+      return _asList(res.data)
+          .whereType<Map<String, dynamic>>()
+          .map(Contract.fromJson)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// POST /api/companies/{id}/contracts → create a contract.
+  Future<Contract> createContract(
+      String companyId, CreateContractInput input) async {
+    try {
+      final res = await _auth.post(
+        ApiConfig.companyContractsPath(companyId),
+        data: input.toJson(),
+      );
+      _ensureOk(res);
+      final data = res.data;
+      if (data is! Map<String, dynamic>) {
+        throw ApiException(message: 'Unexpected response from the server.');
+      }
+      return Contract.fromJson(data);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  // ---- USER LIFECYCLE (activate / deactivate / delete) ----
+
+  /// PUT /api/users/{id}/active → toggle a staff user's active flag.
+  Future<AdminUser> setUserActive(String userId, bool active) async {
+    try {
+      final res = await _auth.put(
+        ApiConfig.userActivePath(userId),
+        data: {'active': active},
+      );
+      _ensureOk(res);
+      final data = res.data;
+      if (data is! Map<String, dynamic>) {
+        throw ApiException(message: 'Unexpected response from the server.');
+      }
+      return AdminUser.fromJson(data);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// DELETE /api/users/{id} → delete a staff (valet/driver) account.
+  Future<void> deleteUser(String userId) async {
+    try {
+      final res = await _auth.delete(ApiConfig.userPath(userId));
+      _ensureOk(res);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }

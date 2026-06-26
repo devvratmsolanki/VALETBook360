@@ -129,6 +129,40 @@ public class CompanyController {
         return ResponseEntity.noContent().build();
     }
 
+    // ------------------------------------------------------------ contracts
+
+    /** GET /api/companies/{id}/contracts — contracts for a company, newest first. */
+    @GetMapping("/companies/{id}/contracts")
+    public List<com.valet.auth.dto.ContractResponse> listContracts(
+            @PathVariable("id") UUID id) {
+        return service.listContracts(principal(), id);
+    }
+
+    /** POST /api/companies/{id}/contracts — create a contract. */
+    @PostMapping("/companies/{id}/contracts")
+    public ResponseEntity<com.valet.auth.dto.ContractResponse> createContract(
+            @PathVariable("id") UUID id,
+            @Valid @RequestBody com.valet.auth.dto.CreateContractRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(service.createContract(principal(), id, req));
+    }
+
+    // ------------------------------------------------- user lifecycle
+
+    /** PUT /api/users/{id}/active — toggle a staff user's active flag. */
+    @PutMapping("/users/{id}/active")
+    public AdminUserResponse setUserActive(@PathVariable("id") UUID id,
+            @RequestBody com.valet.auth.dto.SetActiveRequest req) {
+        return service.setUserActive(principal(), id, req.active());
+    }
+
+    /** DELETE /api/users/{id} — delete a staff (valet/driver) account. */
+    @org.springframework.web.bind.annotation.DeleteMapping("/users/{id}")
+    public ResponseEntity<Void> deleteUser(@PathVariable("id") UUID id) {
+        service.deleteUser(principal(), id);
+        return ResponseEntity.noContent().build();
+    }
+
     // ---------------------------------------------------------- staff/users
 
     /**
