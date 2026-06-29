@@ -68,7 +68,18 @@ class ValetDriverApp extends ConsumerWidget {
         child: Stack(
           children: [
             child ?? const SizedBox.shrink(),
-            if (authed) const Positioned.fill(child: HelpChatbot()),
+            // The assistant lives above the router, so it needs its OWN Overlay
+            // ancestor — without it the chat TextField throws "No Overlay widget
+            // found" on focus. A lightweight Overlay here provides one; empty
+            // areas don't absorb taps, so the app underneath stays interactive.
+            if (authed)
+              Positioned.fill(
+                child: Overlay(
+                  initialEntries: [
+                    OverlayEntry(builder: (_) => const HelpChatbot()),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
