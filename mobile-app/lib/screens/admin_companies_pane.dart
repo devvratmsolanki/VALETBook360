@@ -59,6 +59,47 @@ class AdminCompaniesPane extends ConsumerWidget {
     CompaniesState state,
     CompaniesController notifier,
   ) {
+    Future<void> deleteCompany(Company c) async {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: VColors.surface900,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(VRadius.lg),
+            side: BorderSide(color: VColors.surface700),
+          ),
+          title: Text('Delete ${c.displayName}?',
+              style: VType.body.copyWith(color: VColors.contentStrong)),
+          content: Text(
+              'This permanently deletes the company and ALL of its locations, '
+              'key slots, contracts, and user accounts. This cannot be undone.',
+              style: VType.caption),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Cancel', style: TextStyle(color: VColors.contentMuted)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Delete', style: TextStyle(color: VColors.alertDanger)),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !context.mounted) return;
+      final done = await notifier.delete(c.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(
+          content: Text(done
+              ? 'Company deleted'
+              : (notifier.createError ?? 'Could not delete the company')),
+          backgroundColor: VColors.surface700,
+          behavior: SnackBarBehavior.floating,
+        ));
+    }
+
     switch (state.status) {
       case CompaniesStatus.loading:
         return Center(
@@ -108,7 +149,8 @@ class AdminCompaniesPane extends ConsumerWidget {
                   spacing: VSpace.x3,
                   runSpacing: VSpace.x3,
                   children: [
-                    for (final c in state.companies) _CompanyCard(company: c),
+                    for (final c in state.companies)
+                      _CompanyCard(company: c, onDelete: () => deleteCompany(c)),
                   ],
                 ),
               ),
@@ -120,8 +162,15 @@ class AdminCompaniesPane extends ConsumerWidget {
 }
 
 class _CompanyCard extends StatelessWidget {
-  const _CompanyCard({required this.company});
+  const _CompanyCard({required this.company, this.onDelete});
   final Company company;
+  final VoidCallback? onDelete;
+
+  String get _initials {
+    final name = company.displayName.trim();
+    final parts = name.split(RegExp(r'\s+'));
+    return parts.isNotEmpty ? parts.first[0].toUpperCase() : 'C';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,44 +189,98 @@ class _CompanyCard extends StatelessWidget {
           );
         },
         child: Container(
-          padding: const EdgeInsets.all(VSpace.x4),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(VRadius.lg),
             border: Border.all(color: VColors.surface700, width: 1),
           ),
-          child: Row(
+          child: Column(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: VColors.brand900,
-                  borderRadius: BorderRadius.circular(VRadius.md),
-                ),
-                child: Icon(Icons.business_rounded,
-                    color: VColors.brand300),
-              ),
-              const SizedBox(width: VSpace.x3),
-              Expanded(
-                child: Column(
+              // ---- Top: icon + name/owner + chevron ----
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    VSpace.x4, VSpace.x4, VSpace.x3, VSpace.x3),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(company.displayName,
-                        style: VType.bodyLg
-                            .copyWith(color: VColors.contentStrong),
-                        overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: VSpace.x1),
-                    Text(
-                      company.ownerName ?? company.email ?? '—',
-                      style: VType.caption,
-                      overflow: TextOverflow.ellipsis,
+                    Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: VColors.brand900,
+                        borderRadius: BorderRadius.circular(VRadius.md),
+                      ),
+                      child: Text(_initials,
+                          style: VType.label.copyWith(
+                              color: VColors.brand300, fontSize: 16)),
+                    ),
+                    const SizedBox(width: VSpace.x3),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(company.displayName,
+                              style: VType.bodyLg
+                                  .copyWith(color: VColors.contentStrong),
+                              overflow: TextOverflow.ellipsis),
+                          const SizedBox(height: 2),
+                          Text(
+                            company.ownerName ?? company.email ?? '—',
+                            style: VType.caption,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (onDelete != null)
+                      IconButton(
+                        tooltip: 'Delete company',
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(Icons.delete_outline_rounded,
+                            color: VColors.alertDanger, size: 20),
+                        onPressed: onDelete,
+                      ),
+                    Icon(Icons.chevron_right_rounded,
+                        color: VColors.contentMuted, size: 20),
+                  ],
+                ),
+              ),
+              // ---- Divider + footer ----
+              Divider(height: 1, color: VColors.surface700),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    VSpace.x4, VSpace.x2, VSpace.x4, VSpace.x2),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_on_outlined,
+                        size: 13, color: VColors.contentFaint),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        company.email ?? 'No email',
+                        style: VType.caption.copyWith(
+                            color: VColors.contentFaint, fontSize: 11),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: VColors.brand900,
+                        borderRadius: BorderRadius.circular(VRadius.full),
+                        border: Border.all(
+                            color: VColors.brand400.withValues(alpha: 0.3),
+                            width: 1),
+                      ),
+                      child: Text('View →',
+                          style: VType.caption.copyWith(
+                              color: VColors.brand300,
+                              fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: VColors.contentMuted),
             ],
           ),
         ),

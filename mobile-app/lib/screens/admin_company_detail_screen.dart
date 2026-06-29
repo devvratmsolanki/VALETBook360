@@ -14,10 +14,7 @@ import '../widgets/v_states.dart';
 import 'admin_location_create_screen.dart';
 import 'admin_staff_create_screen.dart';
 
-/// Company drill-down — re-platforms `CompanyDetail.jsx`: tabbed Overview /
-/// Locations / Operators / Drivers. Reached by tapping a company card (admin) or
-/// landed directly for a manager (their own company). Each people/location tab
-/// has its own add action; locations are editable.
+/// Company drill-down — tabbed Overview / Locations / Operators / Drivers.
 class AdminCompanyDetailScreen extends ConsumerWidget {
   const AdminCompanyDetailScreen({super.key, required this.companyId});
 
@@ -35,16 +32,27 @@ class AdminCompanyDetailScreen extends ConsumerWidget {
         backgroundColor: VColors.surface950,
         appBar: AppBar(
           backgroundColor: VColors.surface950,
+          elevation: 0,
           titleSpacing: 0,
           title: Row(
             children: [
               const AppLogo(height: 22),
               const SizedBox(width: VSpace.x3),
               Flexible(
-                child: Text(
-                  state.company?.displayName ?? 'Company',
-                  style: VType.title.copyWith(color: VColors.contentStrong),
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      state.company?.displayName ?? 'Company',
+                      style: VType.title.copyWith(color: VColors.contentStrong),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (state.company?.email != null)
+                      Text(state.company!.email!,
+                          style: VType.caption,
+                          overflow: TextOverflow.ellipsis),
+                  ],
                 ),
               ),
             ],
@@ -52,8 +60,7 @@ class AdminCompanyDetailScreen extends ConsumerWidget {
           actions: [
             IconButton(
               tooltip: 'Refresh',
-              icon: Icon(Icons.refresh_rounded,
-                  color: VColors.contentMuted),
+              icon: Icon(Icons.refresh_rounded, color: VColors.contentMuted),
               onPressed: notifier.load,
             ),
             const SizedBox(width: VSpace.x2),
@@ -61,6 +68,7 @@ class AdminCompanyDetailScreen extends ConsumerWidget {
           bottom: TabBar(
             isScrollable: true,
             indicatorColor: VColors.brand400,
+            indicatorWeight: 2.5,
             labelColor: VColors.contentStrong,
             unselectedLabelColor: VColors.contentMuted,
             labelStyle: VType.label,
@@ -89,9 +97,7 @@ class AdminCompanyDetailScreen extends ConsumerWidget {
   ) {
     switch (state.status) {
       case DetailStatus.loading:
-        return Center(
-          child: CircularProgressIndicator(color: VColors.brand400),
-        );
+        return Center(child: CircularProgressIndicator(color: VColors.brand400));
       case DetailStatus.error:
         return Padding(
           padding: const EdgeInsets.all(VSpace.x4),
@@ -107,21 +113,17 @@ class AdminCompanyDetailScreen extends ConsumerWidget {
           children: [
             _OverviewTab(state: state),
             _LocationsTab(companyId: companyId, state: state),
-            _PeopleTab(
-              companyId: companyId,
-              state: state,
-              role: 'valet',
-            ),
-            _PeopleTab(
-              companyId: companyId,
-              state: state,
-              role: 'driver',
-            ),
+            _PeopleTab(companyId: companyId, state: state, role: 'valet'),
+            _PeopleTab(companyId: companyId, state: state, role: 'driver'),
           ],
         );
     }
   }
 }
+
+// ===========================================================================
+// Overview
+// ===========================================================================
 
 class _OverviewTab extends StatelessWidget {
   const _OverviewTab({required this.state});
@@ -135,26 +137,28 @@ class _OverviewTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(VSpace.x4),
         children: [
-        _StatRow(
-          stats: [
+          _StatRow(stats: [
             _Stat('Locations', state.locations.length),
             _Stat('Operators', state.operators.length),
             _Stat('Drivers', state.drivers.length),
-          ],
-        ),
-        const SizedBox(height: VSpace.x4),
-        _InfoCard(
-          rows: [
+          ]),
+          const SizedBox(height: VSpace.x5),
+          _SectionLabel('Company Info'),
+          const SizedBox(height: VSpace.x2),
+          _InfoCard(rows: [
             _InfoRow('Owner', c?.ownerName ?? '—'),
             _InfoRow('Email', c?.email ?? '—'),
             _InfoRow('Phone', c?.phone ?? '—'),
-          ],
-        ),
+          ]),
         ],
       ),
     );
   }
 }
+
+// ===========================================================================
+// Locations
+// ===========================================================================
 
 class _LocationsTab extends ConsumerWidget {
   const _LocationsTab({required this.companyId, required this.state});
@@ -179,6 +183,17 @@ class _LocationsTab extends ConsumerWidget {
           errorReader: () => notifier.createError,
         );
 
+    Future<void> delete(AdminLocation loc) async {
+      final ok = await _confirmDelete(context, loc.name,
+          message: 'This deletes the location and its key slots, and unassigns '
+              'any staff pinned to it. Existing transactions keep their record. '
+              'This cannot be undone.');
+      if (ok != true || !context.mounted) return;
+      final done = await notifier.deleteLocation(loc.id);
+      if (!context.mounted) return;
+      _snack(context, done ? 'Location deleted' : (notifier.createError ?? 'Could not delete the location'));
+    }
+
     if (state.locations.isEmpty) {
       return _EmptyTab(
         icon: Icons.location_off_outlined,
@@ -194,8 +209,7 @@ class _LocationsTab extends ConsumerWidget {
         VBoundedContent(
           padding: EdgeInsets.zero,
           child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(
-                VSpace.x4, VSpace.x4, VSpace.x4, 96),
+            padding: const EdgeInsets.fromLTRB(VSpace.x4, VSpace.x4, VSpace.x4, 96),
             itemCount: state.locations.length,
             separatorBuilder: (_, __) => const SizedBox(height: VSpace.x3),
             itemBuilder: (_, i) {
@@ -206,11 +220,22 @@ class _LocationsTab extends ConsumerWidget {
                 subtitle: loc.locationLine.isNotEmpty
                     ? loc.locationLine
                     : '${loc.keyCapacity} key slots',
-                trailing: IconButton(
-                  tooltip: 'Edit',
-                  icon: Icon(Icons.edit_outlined,
-                      size: 20, color: VColors.contentMuted),
-                  onPressed: () => edit(loc),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Edit',
+                      icon: Icon(Icons.edit_outlined,
+                          size: 20, color: VColors.contentMuted),
+                      onPressed: () => edit(loc),
+                    ),
+                    IconButton(
+                      tooltip: 'Delete',
+                      icon: Icon(Icons.delete_outline_rounded,
+                          size: 20, color: VColors.alertDanger),
+                      onPressed: () => delete(loc),
+                    ),
+                  ],
                 ),
                 badge: '${loc.keyCapacity} keys',
               );
@@ -223,7 +248,11 @@ class _LocationsTab extends ConsumerWidget {
   }
 }
 
-class _PeopleTab extends ConsumerWidget {
+// ===========================================================================
+// People tab — shared by Operators + Drivers
+// ===========================================================================
+
+class _PeopleTab extends ConsumerStatefulWidget {
   const _PeopleTab({
     required this.companyId,
     required this.state,
@@ -232,41 +261,70 @@ class _PeopleTab extends ConsumerWidget {
 
   final String companyId;
   final CompanyDetailState state;
-
-  /// `valet` (operators) | `driver`.
-  final String role;
+  final String role; // 'valet' or 'driver'
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final notifier =
-        ref.read(companyDetailControllerProvider(companyId).notifier);
-    final isDriver = role == 'driver';
-    final people = isDriver ? state.drivers : state.operators;
+  ConsumerState<_PeopleTab> createState() => _PeopleTabState();
+}
+
+class _PeopleTabState extends ConsumerState<_PeopleTab> {
+  final Set<String> _toggling = {};
+
+  CompanyDetailController get _notifier =>
+      ref.read(companyDetailControllerProvider(widget.companyId).notifier);
+
+  Future<void> _toggle(AdminUser u) async {
+    if (_toggling.contains(u.id)) return;
+    setState(() => _toggling.add(u.id));
+    final ok = await _notifier.setUserActive(
+      u.id,
+      !u.active,
+      isDriver: widget.role == 'driver',
+    );
+    if (mounted) {
+      setState(() => _toggling.remove(u.id));
+      if (!ok && _notifier.createError != null) {
+        _snack(context, _notifier.createError!);
+      }
+    }
+  }
+
+  Future<void> _delete(AdminUser u) async {
+    final confirmed = await _confirmDelete(context, u.displayName);
+    if (confirmed != true || !mounted) return;
+    final ok = await _notifier.deleteUser(u.id, isDriver: widget.role == 'driver');
+    if (!ok && mounted && _notifier.createError != null) {
+      _snack(context, _notifier.createError!);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDriver = widget.role == 'driver';
+    final people = isDriver ? widget.state.drivers : widget.state.operators;
     final noun = isDriver ? 'driver' : 'operator';
 
     Future<void> add() => AdminStaffSheet.show(
           context,
-          role: role,
-          locations: state.locations,
-          onSubmit: notifier.addStaff,
-          errorReader: () => notifier.createError,
+          role: widget.role,
+          locations: widget.state.locations,
+          onSubmit: _notifier.addStaff,
+          errorReader: () => _notifier.createError,
         );
 
     Future<void> edit(AdminUser u) => AdminStaffSheet.show(
           context,
           role: u.role,
-          locations: state.locations,
+          locations: widget.state.locations,
           existing: u,
-          onSubmit: notifier.addStaff,
-          onUpdate: (input) => notifier.updateStaff(u.id, input),
-          errorReader: () => notifier.createError,
+          onSubmit: _notifier.addStaff,
+          onUpdate: (input) => _notifier.updateStaff(u.id, input),
+          errorReader: () => _notifier.createError,
         );
 
     if (people.isEmpty) {
       return _EmptyTab(
-        icon: isDriver
-            ? Icons.person_off_outlined
-            : Icons.badge_outlined,
+        icon: isDriver ? Icons.person_off_outlined : Icons.badge_outlined,
         headline: 'No ${noun}s yet',
         hint: 'Add a $noun login to get this company moving.',
         actionLabel: 'Add $noun',
@@ -278,27 +336,21 @@ class _PeopleTab extends ConsumerWidget {
       children: [
         VBoundedContent(
           padding: EdgeInsets.zero,
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(
-                VSpace.x4, VSpace.x4, VSpace.x4, 96),
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(VSpace.x4, VSpace.x4, VSpace.x4, 96),
             itemCount: people.length,
-            separatorBuilder: (_, __) => const SizedBox(height: VSpace.x3),
             itemBuilder: (_, i) {
               final u = people[i];
-              return _Tile(
-                leading: isDriver
-                    ? Icons.person_pin_circle_rounded
-                    : Icons.badge_rounded,
-                title: u.displayName,
-                subtitle: u.email,
-                badge: u.active ? 'Active' : 'Inactive',
-                badgeColor:
-                    u.active ? VColors.alertSuccess : VColors.contentFaint,
-                trailing: IconButton(
-                  tooltip: 'Edit',
-                  icon: Icon(Icons.edit_outlined,
-                      size: 20, color: VColors.contentMuted),
-                  onPressed: () => edit(u),
+              return Padding(
+                padding: i < people.length - 1
+                    ? const EdgeInsets.only(bottom: VSpace.x3)
+                    : EdgeInsets.zero,
+                child: _MemberCard(
+                  user: u,
+                  isToggling: _toggling.contains(u.id),
+                  onToggle: () => _toggle(u),
+                  onEdit: () => edit(u),
+                  onDelete: () => _delete(u),
                 ),
               );
             },
@@ -310,7 +362,259 @@ class _PeopleTab extends ConsumerWidget {
   }
 }
 
-// ---- Shared bits ----
+// ===========================================================================
+// _MemberCard — rich card for each operator / driver
+// ===========================================================================
+
+class _MemberCard extends StatelessWidget {
+  const _MemberCard({
+    required this.user,
+    required this.isToggling,
+    required this.onToggle,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final AdminUser user;
+  final bool isToggling;
+  final VoidCallback onToggle;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  String get _initials {
+    final name = user.displayName.trim();
+    final parts = name.split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = user.active;
+    final activeColor = isActive ? VColors.alertSuccess : VColors.contentFaint;
+    final roleName = user.role == 'driver' ? 'Driver' : 'Operator';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: VColors.surface900,
+        borderRadius: BorderRadius.circular(VRadius.lg),
+        border: Border.all(
+          color: isActive
+              ? VColors.alertSuccess.withValues(alpha: 0.3)
+              : VColors.surface700,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          // ---- Top: avatar, name/email, role chip, actions ----
+          Padding(
+            padding: const EdgeInsets.fromLTRB(VSpace.x4, VSpace.x4, VSpace.x2, VSpace.x3),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Avatar with initials
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: VColors.brand900,
+                    borderRadius: BorderRadius.circular(VRadius.md),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    _initials,
+                    style: VType.label.copyWith(
+                        color: VColors.brand300, fontSize: 15),
+                  ),
+                ),
+                const SizedBox(width: VSpace.x3),
+                // Name + email
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.displayName,
+                        style: VType.label.copyWith(color: VColors.contentStrong),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(user.email, style: VType.caption,
+                          overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                // Role chip
+                Container(
+                  margin: const EdgeInsets.only(left: VSpace.x2, top: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: VColors.brand900,
+                    borderRadius: BorderRadius.circular(VRadius.full),
+                    border: Border.all(
+                        color: VColors.brand400.withValues(alpha: 0.4), width: 1),
+                  ),
+                  child: Text(roleName,
+                      style: VType.caption.copyWith(
+                          color: VColors.brand300, fontWeight: FontWeight.w600)),
+                ),
+                // ⋮ popup menu
+                PopupMenuButton<String>(
+                  color: VColors.surface800,
+                  icon: Icon(Icons.more_vert_rounded,
+                      color: VColors.contentMuted, size: 20),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(VRadius.md),
+                    side: BorderSide(color: VColors.surface600, width: 1),
+                  ),
+                  onSelected: (v) {
+                    if (v == 'edit') onEdit();
+                    if (v == 'delete') onDelete();
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(children: [
+                        Icon(Icons.edit_outlined,
+                            size: 16, color: VColors.contentMuted),
+                        const SizedBox(width: VSpace.x2),
+                        Text('Edit',
+                            style: VType.body
+                                .copyWith(color: VColors.contentStrong)),
+                      ]),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(children: [
+                        Icon(Icons.delete_outline_rounded,
+                            size: 16, color: VColors.alertDanger),
+                        const SizedBox(width: VSpace.x2),
+                        Text('Delete',
+                            style: TextStyle(color: VColors.alertDanger)),
+                      ]),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // ---- Divider ----
+          Divider(height: 1, color: VColors.surface700),
+
+          // ---- Bottom: status dot + label + switch ----
+          Padding(
+            padding: const EdgeInsets.fromLTRB(VSpace.x4, VSpace.x2, VSpace.x3, VSpace.x2),
+            child: Row(
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: activeColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: VSpace.x2),
+                Text(
+                  isActive ? 'Active' : 'Inactive',
+                  style: VType.caption.copyWith(
+                      color: activeColor, fontWeight: FontWeight.w600),
+                ),
+                const Spacer(),
+                if (isToggling)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
+                  )
+                else
+                  Transform.scale(
+                    scale: 0.8,
+                    alignment: Alignment.centerRight,
+                    child: Switch(
+                      value: isActive,
+                      onChanged: (_) => onToggle(),
+                      activeColor: VColors.alertSuccess,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// Helpers
+// ===========================================================================
+
+void _snack(BuildContext context, String message) {
+  ScaffoldMessenger.of(context)
+    ..clearSnackBars()
+    ..showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: VColors.surface700,
+      behavior: SnackBarBehavior.floating,
+    ));
+}
+
+Future<bool?> _confirmDelete(BuildContext context, String name, {String? message}) {
+  return showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      backgroundColor: VColors.surface900,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(VRadius.lg),
+        side: BorderSide(color: VColors.surface700),
+      ),
+      title: Text('Delete $name?',
+          style: VType.body.copyWith(color: VColors.contentStrong)),
+      content: Text(
+          message ?? 'This removes their login permanently and cannot be undone.',
+          style: VType.caption),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text('Cancel', style: TextStyle(color: VColors.contentMuted)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child:
+              Text('Delete', style: TextStyle(color: VColors.alertDanger)),
+        ),
+      ],
+    ),
+  );
+}
+
+// ===========================================================================
+// Reusable sub-widgets
+// ===========================================================================
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        label.toUpperCase(),
+        style: VType.caption.copyWith(
+          color: VColors.contentMuted,
+          letterSpacing: 1.2,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+}
 
 class _Stat {
   const _Stat(this.label, this.value);
@@ -345,9 +649,7 @@ class _StatRow extends StatelessWidget {
                   const SizedBox(height: VSpace.x1),
                   Text(stats[i].label.toUpperCase(),
                       style: VType.caption.copyWith(
-                        color: VColors.contentMuted,
-                        letterSpacing: 1.2,
-                      )),
+                          color: VColors.contentMuted, letterSpacing: 1.2)),
                 ],
               ),
             ),
@@ -380,8 +682,7 @@ class _InfoCard extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < rows.length; i++) ...[
-            if (i > 0)
-              Divider(color: VColors.surface700, height: VSpace.x6),
+            if (i > 0) Divider(color: VColors.surface700, height: VSpace.x6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -390,11 +691,9 @@ class _InfoCard extends StatelessWidget {
                   child: Text(rows[i].label, style: VType.caption),
                 ),
                 Expanded(
-                  child: Text(
-                    rows[i].value,
-                    style:
-                        VType.body.copyWith(color: VColors.contentStrong),
-                  ),
+                  child: Text(rows[i].value,
+                      style:
+                          VType.body.copyWith(color: VColors.contentStrong)),
                 ),
               ],
             ),
@@ -412,7 +711,8 @@ class _Tile extends StatelessWidget {
     required this.subtitle,
     this.trailing,
     this.badge,
-    this.badgeColor, // defaults to brand300 at build (runtime token now)
+    this.badgeColor,
+    this.badgeWidget,
   });
 
   final IconData leading;
@@ -421,10 +721,11 @@ class _Tile extends StatelessWidget {
   final Widget? trailing;
   final String? badge;
   final Color? badgeColor;
+  final Widget? badgeWidget;
 
   @override
   Widget build(BuildContext context) {
-    final badgeColor = this.badgeColor ?? VColors.brand300;
+    final resolvedBadgeColor = badgeColor ?? VColors.brand300;
     return Container(
       constraints: const BoxConstraints(minHeight: VTarget.minTouch),
       padding: const EdgeInsets.symmetric(
@@ -443,8 +744,7 @@ class _Tile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style:
-                        VType.label.copyWith(color: VColors.contentStrong),
+                    style: VType.label.copyWith(color: VColors.contentStrong),
                     overflow: TextOverflow.ellipsis),
                 const SizedBox(height: VSpace.x1),
                 Text(subtitle,
@@ -452,20 +752,24 @@ class _Tile extends StatelessWidget {
               ],
             ),
           ),
-          if (badge != null) ...[
+          if (badgeWidget != null) ...[
+            const SizedBox(width: VSpace.x2),
+            badgeWidget!,
+          ] else if (badge != null) ...[
             const SizedBox(width: VSpace.x2),
             Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: VSpace.x2, vertical: 2),
               decoration: BoxDecoration(
-                color: badgeColor.withValues(alpha: 0.14),
+                color: resolvedBadgeColor.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(VRadius.full),
                 border: Border.all(
-                    color: badgeColor.withValues(alpha: 0.4), width: 1),
+                    color: resolvedBadgeColor.withValues(alpha: 0.4), width: 1),
               ),
               child: Text(badge!,
                   style: VType.caption.copyWith(
-                      color: badgeColor, fontWeight: FontWeight.w600)),
+                      color: resolvedBadgeColor,
+                      fontWeight: FontWeight.w600)),
             ),
           ],
           if (trailing != null) trailing!,
@@ -516,6 +820,7 @@ class _AddFab extends StatelessWidget {
         heroTag: 'add-$label',
         backgroundColor: VColors.brand500,
         foregroundColor: VColors.contentOnAccent,
+        elevation: 4,
         icon: const Icon(Icons.add_rounded),
         label: Text(label,
             style: VType.label.copyWith(color: VColors.contentOnAccent)),

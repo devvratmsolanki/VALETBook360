@@ -148,6 +148,23 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
     }
   }
 
+  /// Delete a location (server cascades its key slots and unassigns pinned
+  /// users), then refresh the locations slice. Returns true on success.
+  Future<bool> deleteLocation(String locationId) async {
+    createError = null;
+    try {
+      await _client.deleteLocation(locationId);
+      await _refreshLocations();
+      return true;
+    } on ApiException catch (e) {
+      createError = e.message;
+      return false;
+    } catch (_) {
+      createError = 'Could not delete the location. Please try again.';
+      return false;
+    }
+  }
+
   /// Add a staff member (`valet` operator or `driver`) and refresh that slice.
   Future<bool> addStaff(CreateStaffInput input) async {
     createError = null;

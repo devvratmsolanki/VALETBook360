@@ -88,4 +88,22 @@ class CompaniesController extends StateNotifier<CompaniesState> {
       return null;
     }
   }
+
+  /// ADMIN-only cascade delete of a company (server removes its locations,
+  /// slots, contracts, and users). Refetches the list. Returns true on success;
+  /// false + [createError] on failure.
+  Future<bool> delete(String companyId) async {
+    createError = null;
+    try {
+      await _client.deleteCompany(companyId);
+      await load();
+      return true;
+    } on ApiException catch (e) {
+      createError = e.message;
+      return false;
+    } catch (_) {
+      createError = 'Could not delete the company. Please try again.';
+      return false;
+    }
+  }
 }
