@@ -83,16 +83,18 @@ class _HelpChatbotState extends ConsumerState<HelpChatbot> {
     final panelW = size.width - 40 < 380.0 ? size.width - 40 : 380.0;
     final panelH = size.height - 160 < 520.0 ? size.height - 160 : 520.0;
 
+    // Anchored bottom-LEFT so it never collides with a screen's bottom-right
+    // "+ New" FAB (operator floor, company/admin lists, etc.).
     return Stack(
       children: [
         if (_open)
           Positioned(
-            right: 20,
+            left: 20,
             bottom: 92,
             child: _panel(panelW, panelH),
           ),
         Positioned(
-          right: 20,
+          left: 20,
           bottom: 24,
           child: FloatingActionButton(
             heroTag: 'help_assistant_fab',

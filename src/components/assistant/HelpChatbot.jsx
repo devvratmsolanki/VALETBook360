@@ -68,7 +68,7 @@ const HelpChatbot = () => {
                 onClick={() => setOpen((v) => !v)}
                 aria-label={open ? 'Close help assistant' : 'Open help assistant'}
                 className={cn(
-                    'fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full',
+                    'fixed bottom-5 left-5 z-50 flex h-14 w-14 items-center justify-center rounded-full',
                     'bg-brand-500 text-white shadow-lg shadow-brand-500/30 transition-all hover:scale-105 hover:bg-brand-600',
                     'focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2 focus:ring-offset-dark-900',
                 )}
@@ -83,7 +83,7 @@ const HelpChatbot = () => {
                     aria-label="Help assistant"
                     className={cn(
                         'fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-dark-800 shadow-2xl',
-                        'bottom-24 right-5 w-[min(24rem,calc(100vw-2.5rem))] h-[min(34rem,calc(100vh-8rem))]',
+                        'bottom-24 left-5 w-[min(24rem,calc(100vw-2.5rem))] h-[min(34rem,calc(100vh-8rem))]',
                     )}
                 >
                     {/* Header */}

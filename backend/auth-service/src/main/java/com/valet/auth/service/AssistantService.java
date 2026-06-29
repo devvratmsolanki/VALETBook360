@@ -129,15 +129,26 @@ public class AssistantService {
     }
 
     private String systemPrompt(AuthPrincipal caller) {
-        String role = caller.role() == null ? "unknown" : caller.role();
+        // Map the raw DB role to its product meaning — the stored roles
+        // (admin/manager/valet/driver) differ from the UI names, and the model
+        // must know admin == Super Admin (full access) or it gives wrong answers.
+        String r = caller.role() == null ? "" : caller.role().toLowerCase();
+        String roleDesc = switch (r) {
+            case "admin" -> "Super Admin — FULL access: can add/edit/delete ANY company, location, user, operator, and driver, and see all data across the whole platform";
+            case "manager" -> "Company owner — manages their OWN company only: its locations, operators, drivers, contracts, and key slots";
+            case "valet" -> "Operator — works the operator floor: checks cars in/out and assigns key slots and drivers";
+            case "driver" -> "Driver — receives and advances park/retrieve missions";
+            default -> "a user of the app";
+        };
         String name = caller.name() == null ? "" : (" Their name is " + caller.name() + ".");
         return "You are the in-app help assistant for LogBook360, embedded in the app. "
-                + "The user's role is \"" + role + "\"." + name + "\n\n" + APP_OVERVIEW + "\n\n"
+                + "The user is a " + roleDesc + "." + name + "\n\n" + APP_OVERVIEW + "\n\n"
                 + "Guidelines:\n"
-                + "- Help the user understand and operate THIS app. Give short, concrete, step-by-step answers using the real screen/button names above.\n"
-                + "- Tailor guidance to the user's role; if they ask about something only a higher role can do, say so.\n"
-                + "- If you don't know an app-specific detail, say so plainly rather than inventing menus.\n"
-                + "- Stay on-topic: you assist with using LogBook360. Politely decline unrelated requests.\n"
+                + "- STRICT SCOPE: you ONLY answer questions about using the LogBook360 app (its features and roles described above). "
+                + "For ANYTHING else — general knowledge, coding, math, news, opinions, other products, translations, jokes, or chit-chat — do NOT answer. "
+                + "Reply with exactly: \"I can only help with using LogBook360 — try asking about check-in, key slots, drivers, locations, team members, or your dashboard.\"\n"
+                + "- Answer ONLY from the app facts above. Never invent screens, buttons, settings, prices, integrations, or data the app doesn't have. If you're not sure, say you're not sure and suggest where in the app to look.\n"
+                + "- Tailor guidance to the user's role; if they ask about something only a higher role can do, say who can do it.\n"
                 + "- Be concise — a few sentences or a short numbered list. No preamble.";
     }
 }
