@@ -38,10 +38,22 @@ class _SlideToAdvanceState extends State<SlideToAdvance>
 
   double _drag = 0; // 0..1
   bool _passedThreshold = false;
-  late final AnimationController _settle = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 220),
-  );
+  late final AnimationController _settle;
+
+  @override
+  void initState() {
+    super.initState();
+    // Create the controller eagerly while mounted. A `late final = ...` lazy
+    // initializer would construct it on FIRST access — which, for a slider the
+    // user never dragged, is `_settle.dispose()` below. Creating a Ticker during
+    // dispose() does an unsafe ancestor lookup on a deactivated widget ("Looking
+    // up a deactivated widget's ancestor is unsafe") and throws when the mission
+    // card unmounts (e.g. the AnimatedSwitcher swapping cards on a status change).
+    _settle = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+  }
 
   @override
   void dispose() {

@@ -14,7 +14,6 @@ import '../widgets/app_logo.dart';
 import '../widgets/mission_card.dart';
 import '../widgets/success_burst.dart';
 import '../widgets/theme_toggle_button.dart';
-import '../widgets/v_adaptive.dart';
 import '../widgets/v_states.dart';
 
 /// 7.5 Driver — Mission Stack (home). Active mission full-bleed with the
@@ -220,10 +219,12 @@ class _MissionStackScreenState extends ConsumerState<MissionStackScreen> {
                   VSpace.x4,
                   VSpace.x4,
                 ),
-                child: VBoundedContent(
-                  maxWidth: 640,
-                  padding: EdgeInsets.zero,
-                  child: Stack(
+                // The driver mission flow fills height (the active card's
+                // Expanded children need a bounded height from the min-height
+                // chain below), so we cap WIDTH on the card itself rather than
+                // wrap the Stack in a centering Align — an Align here would strip
+                // the min-height constraint and the flex children would overflow.
+                child: Stack(
                   alignment: Alignment.topCenter,
                   children: [
                     // Up-next peek (scale 0.94, dimmed) behind the active card.
@@ -263,10 +264,18 @@ class _MissionStackScreenState extends ConsumerState<MissionStackScreen> {
                         ),
                         child: ConstrainedBox(
                           key: ValueKey('${active.id}:${active.status.wire}'),
-                          constraints: BoxConstraints(
-                            minHeight: constraints.maxHeight -
+                          // The mission card's Column distributes content with
+                          // flex Spacers, so it needs a BOUNDED height. Inside the
+                          // scroll view the incoming maxHeight is infinite, so pin
+                          // the card to the viewport height (minus the peek
+                          // offset) with a TIGHT height — a min-height-only box
+                          // leaves maxHeight unbounded and the Spacers assert.
+                          // maxWidth caps it on wide screens; the Stack's
+                          // topCenter centers it.
+                          constraints: BoxConstraints.tightFor(
+                            height: constraints.maxHeight -
                                 (upNext != null ? 40 : 24),
-                          ),
+                          ).copyWith(maxWidth: 640),
                           child: MissionCard(
                             mission: active,
                             busy: busy,
@@ -276,7 +285,6 @@ class _MissionStackScreenState extends ConsumerState<MissionStackScreen> {
                       ),
                     ),
                   ],
-                ),
                 ),
               ),
             ),
