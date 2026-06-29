@@ -136,6 +136,38 @@ public class CompanyAdminService {
     }
 
     /**
+     * ADMIN-only hard delete of a company and everything it owns, in one
+     * transaction: every location's key slots, the locations, the company's
+     * contracts, and all its user accounts (including the owner), then the
+     * company row. Destructive and irreversible — the controller restricts this
+     * to ADMIN and the UI must confirm. A caller may not delete the company they
+     * belong to (admins are tenant-less, so this only guards a misconfigured
+     * tenant-bound admin). Historical {@code valet_transactions} in the core DB
+     * keep their denormalized company/location ids (no cross-service FK).
+     */
+    @Transactional
+    public void deleteCompany(AuthPrincipal caller, UUID companyId) {
+        requireAdmin(caller);
+        Company company = companies.findById(companyId)
+                .orElseThrow(() -> ServiceException.notFound("COMPANY_NOT_FOUND",
+                        "That company could not be found."));
+        if (companyId.equals(caller.companyId())) {
+            throw ServiceException.conflict("CANNOT_DELETE_OWN_COMPANY",
+                    "You can't delete the company your own account belongs to.");
+        }
+
+        List<Location> locs = locations.findByCompanyIdOrderByNameAsc(companyId);
+        for (Location loc : locs) {
+            keySlots.deleteAll(
+                    keySlots.findByLocationIdOrderBySortOrderAscSlotNameAsc(loc.getId()));
+        }
+        locations.deleteAll(locs);
+        contracts.deleteAll(contracts.findByCompanyIdOrderByCreatedAtDesc(companyId));
+        users.deleteAll(users.findByCompanyId(companyId));
+        companies.delete(company);
+    }
+
+    /**
      * ADMIN-only create-company-with-owner. Inserts the {@code valet_companies}
      * row and the owner {@code users} row (role {@code manager}) in a single
      * transaction — if the owner insert fails (e.g. duplicate email) the whole
@@ -243,6 +275,35 @@ public class CompanyAdminService {
         loc.setKeyCapacity(req.keyCapacity());
         locations.save(loc);
         return LocationResponse.from(loc);
+    }
+
+    /**
+     * Delete a location. Admin → any; manager → own only (authorized against the
+     * location's owning company). Cascade within the auth DB: its key slots are
+     * removed and any users pinned to it are unassigned (location_id → null) so
+     * no row is left dangling. Historical {@code valet_transactions} in the core
+     * DB keep their denormalized {@code location_id} snapshot (no cross-service
+     * FK) — they are not affected.
+     */
+    @Transactional
+    public void deleteLocation(AuthPrincipal caller, UUID locationId) {
+        Location loc = locations.findById(locationId)
+                .orElseThrow(() -> ServiceException.notFound("LOCATION_NOT_FOUND",
+                        "That location could not be found."));
+        loadCompanyAuthorized(caller, loc.getCompanyId());
+
+        // Unassign anyone pinned to this location.
+        List<User> pinned = users.findByLocationId(locationId);
+        for (User u : pinned) {
+            u.setLocationId(null);
+        }
+        if (!pinned.isEmpty()) {
+            users.saveAll(pinned);
+        }
+        // Remove the location's key slots, then the location itself.
+        keySlots.deleteAll(
+                keySlots.findByLocationIdOrderBySortOrderAscSlotNameAsc(locationId));
+        locations.delete(loc);
     }
 
     /**

@@ -78,6 +78,16 @@ public class CompanyController {
         return service.getCompany(principal(), id);
     }
 
+    /**
+     * DELETE /api/companies/{id} — ADMIN only. Cascade-deletes the company and
+     * everything it owns (locations, key slots, contracts, users). Irreversible.
+     */
+    @org.springframework.web.bind.annotation.DeleteMapping("/companies/{id}")
+    public ResponseEntity<Void> deleteCompany(@PathVariable("id") UUID id) {
+        service.deleteCompany(principal(), id);
+        return ResponseEntity.noContent().build();
+    }
+
     // ----------------------------------------------------------- locations
 
     /** GET /api/companies/{id}/locations — admin any; manager own. */
@@ -100,6 +110,16 @@ public class CompanyController {
     public LocationResponse updateLocation(@PathVariable("id") UUID id,
                                            @Valid @RequestBody UpdateLocationRequest req) {
         return service.updateLocation(principal(), id, req);
+    }
+
+    /**
+     * DELETE /api/locations/{id} — delete a location (admin any; manager own).
+     * Cascade-removes its key slots and unassigns any users pinned to it.
+     */
+    @org.springframework.web.bind.annotation.DeleteMapping("/locations/{id}")
+    public ResponseEntity<Void> deleteLocation(@PathVariable("id") UUID id) {
+        service.deleteLocation(principal(), id);
+        return ResponseEntity.noContent().build();
     }
 
     // ------------------------------------------------------------ key slots

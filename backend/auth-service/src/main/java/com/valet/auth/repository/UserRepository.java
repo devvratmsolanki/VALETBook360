@@ -27,6 +27,12 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     /** Users in a company filtered to a single role (e.g. operators/drivers). */
     List<User> findByCompanyIdAndRoleOrderByNameAsc(UUID companyId, Role role);
 
+    /** Users pinned to a location — used to unassign them when it's deleted. */
+    List<User> findByLocationId(UUID locationId);
+
+    /** All users in a company — used for the company cascade delete. */
+    List<User> findByCompanyId(UUID companyId);
+
     /** Paged: users in a company filtered to a single role. */
     Page<User> findByCompanyIdAndRoleOrderByNameAsc(UUID companyId, Role role, Pageable pageable);
 

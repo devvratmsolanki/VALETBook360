@@ -435,6 +435,28 @@ class ApiClient {
     }
   }
 
+  /// DELETE /api/locations/{id} → delete a location (cascades slots; unassigns
+  /// pinned users). Admin any; manager own.
+  Future<void> deleteLocation(String locationId) async {
+    try {
+      final res = await _auth.delete(ApiConfig.locationPath(locationId));
+      _ensureOk(res);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// DELETE /api/companies/{id} → ADMIN-only cascade delete of a company and all
+  /// it owns (locations, slots, contracts, users).
+  Future<void> deleteCompany(String companyId) async {
+    try {
+      final res = await _auth.delete(ApiConfig.companyPath(companyId));
+      _ensureOk(res);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   // ---- KEY SLOTS (Location Detail → Key Slots tab) ----
 
   /// GET /api/locations/{id}/slots → custom key slots for a location.
