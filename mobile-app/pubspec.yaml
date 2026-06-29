@@ -25,6 +25,10 @@ dependencies:
 
   cupertino_icons: ^1.0.8
 
+  # Real brand typefaces (Space Grotesk display + Inter UI + JetBrains Mono),
+  # fetched/cached at runtime so we don't have to vendor .ttf binaries.
+  google_fonts: ^6.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

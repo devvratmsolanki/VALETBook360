@@ -1,172 +1,175 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'v_colors.dart';
 import 'v_tokens.dart';
 
-/// "Vālet Type Scale" — doc §6.2. Inter for UI, JetBrains Mono for plates/codes.
-/// Fonts are referenced by family name; if the .ttf assets are not bundled
-/// (see pubspec note), Flutter falls back gracefully to the platform sans /
-/// monospace, so the app still compiles and renders.
-const String _sans = 'Inter';
-const String _mono = 'JetBrains Mono';
-const List<String> _monoFallback = ['JetBrains Mono', 'monospace'];
+/// "Vālet Type Scale" — redesigned typography.
+///
+/// Display + headings use **Space Grotesk** (geometric, characterful, with
+/// distinctive figures that complement the mono plate codes); UI/body uses
+/// **Inter** (the gold standard for dense product UI); codes/plates use
+/// **JetBrains Mono**. All three are real faces loaded via `google_fonts`
+/// (fetched + cached at runtime) rather than the OS fallback the app shipped
+/// with before. Headings carry slightly negative tracking for a tighter,
+/// more premium feel; sizes/line-heights are unchanged so no layout shifts.
+///
+/// Helpers below centralize the family choice so the scale stays consistent and
+/// a future face swap is a one-line change.
+
+TextStyle _display(
+        {required double size,
+        required double height,
+        required FontWeight weight,
+        double letterSpacing = 0,
+        Color? color}) =>
+    GoogleFonts.spaceGrotesk(
+      fontSize: size,
+      height: height / size,
+      fontWeight: weight,
+      letterSpacing: letterSpacing,
+      color: color,
+    );
+
+TextStyle _ui(
+        {required double size,
+        required double height,
+        required FontWeight weight,
+        double letterSpacing = 0,
+        Color? color}) =>
+    GoogleFonts.inter(
+      fontSize: size,
+      height: height / size,
+      fontWeight: weight,
+      letterSpacing: letterSpacing,
+      color: color,
+    );
+
+TextStyle _code(
+        {required double size,
+        required double height,
+        required FontWeight weight,
+        double letterSpacing = 0,
+        Color? color}) =>
+    GoogleFonts.jetBrainsMono(
+      fontSize: size,
+      height: height / size,
+      fontWeight: weight,
+      letterSpacing: letterSpacing,
+      color: color,
+    );
 
 TextTheme _buildTextTheme() {
   return TextTheme(
-    // display — plate hero on driver mission card (34/40/700)
-    displayLarge: TextStyle(
-      fontFamily: _sans,
-      fontSize: 34,
-      height: 40 / 34,
-      fontWeight: FontWeight.w700,
-      color: VColors.contentStrong,
-    ),
+    // display — plate/section hero (34/40/700, tight tracking)
+    displayLarge: _display(
+        size: 34,
+        height: 40,
+        weight: FontWeight.w700,
+        letterSpacing: -0.8,
+        color: VColors.contentStrong),
     // title-lg — screen titles (24/30/700)
-    headlineSmall: TextStyle(
-      fontFamily: _sans,
-      fontSize: 24,
-      height: 30 / 24,
-      fontWeight: FontWeight.w700,
-      color: VColors.contentStrong,
-    ),
+    headlineSmall: _display(
+        size: 24,
+        height: 30,
+        weight: FontWeight.w700,
+        letterSpacing: -0.6,
+        color: VColors.contentStrong),
     // title — section headers (20/26/600)
-    titleLarge: TextStyle(
-      fontFamily: _sans,
-      fontSize: 20,
-      height: 26 / 20,
-      fontWeight: FontWeight.w600,
-      color: VColors.contentStrong,
-    ),
+    titleLarge: _display(
+        size: 20,
+        height: 26,
+        weight: FontWeight.w600,
+        letterSpacing: -0.3,
+        color: VColors.contentStrong),
     // body-lg — primary body (17/24/500)
-    bodyLarge: TextStyle(
-      fontFamily: _sans,
-      fontSize: 17,
-      height: 24 / 17,
-      fontWeight: FontWeight.w500,
-      color: VColors.contentDefault,
-    ),
+    bodyLarge: _ui(
+        size: 17, height: 24, weight: FontWeight.w500, color: VColors.contentDefault),
     // body — default body (15/22/400)
-    bodyMedium: TextStyle(
-      fontFamily: _sans,
-      fontSize: 15,
-      height: 22 / 15,
-      fontWeight: FontWeight.w400,
-      color: VColors.contentDefault,
-    ),
+    bodyMedium: _ui(
+        size: 15, height: 22, weight: FontWeight.w400, color: VColors.contentDefault),
     // label — buttons, nav, chips (13/18/600)
-    labelLarge: TextStyle(
-      fontFamily: _sans,
-      fontSize: 13,
-      height: 18 / 13,
-      fontWeight: FontWeight.w600,
-      color: VColors.contentDefault,
-    ),
-    // caption — secondary meta, the readable floor (12/16/500)
-    bodySmall: TextStyle(
-      fontFamily: _sans,
-      fontSize: 12,
-      height: 16 / 12,
-      fontWeight: FontWeight.w500,
-      color: VColors.contentMuted,
-    ),
+    labelLarge: _ui(
+        size: 13,
+        height: 18,
+        weight: FontWeight.w600,
+        letterSpacing: 0.1,
+        color: VColors.contentDefault),
+    // caption — secondary meta (12/16/500)
+    bodySmall: _ui(
+        size: 12,
+        height: 16,
+        weight: FontWeight.w500,
+        letterSpacing: 0.2,
+        color: VColors.contentMuted),
   );
 }
 
-/// Named access to the mono styles and the semantic scale steps that don't map
-/// 1:1 onto Material's TextTheme slots.
-///
-/// These are **getters** (not `const`) so their `color`, sourced from the
-/// runtime [VColors] getters, re-reads on a theme toggle. Font/size/weight are
-/// stable; only the resolved color differs between light and dark.
+/// Named access to the semantic scale steps that don't map 1:1 onto Material's
+/// TextTheme slots. Getters (not `const`) so their `color`, sourced from the
+/// runtime [VColors] getters, re-reads on a theme toggle.
 class VType {
   const VType._();
 
-  static TextStyle get display => TextStyle(
-        fontFamily: _sans,
-        fontSize: 34,
-        height: 40 / 34,
-        fontWeight: FontWeight.w700,
-        color: VColors.contentStrong,
-      );
+  static TextStyle get display => _display(
+      size: 34,
+      height: 40,
+      weight: FontWeight.w700,
+      letterSpacing: -0.8,
+      color: VColors.contentStrong);
 
-  static TextStyle get titleLg => TextStyle(
-        fontFamily: _sans,
-        fontSize: 24,
-        height: 30 / 24,
-        fontWeight: FontWeight.w700,
-        color: VColors.contentStrong,
-      );
+  static TextStyle get titleLg => _display(
+      size: 24,
+      height: 30,
+      weight: FontWeight.w700,
+      letterSpacing: -0.6,
+      color: VColors.contentStrong);
 
-  static TextStyle get title => TextStyle(
-        fontFamily: _sans,
-        fontSize: 20,
-        height: 26 / 20,
-        fontWeight: FontWeight.w600,
-        color: VColors.contentStrong,
-      );
+  static TextStyle get title => _display(
+      size: 20,
+      height: 26,
+      weight: FontWeight.w600,
+      letterSpacing: -0.3,
+      color: VColors.contentStrong);
 
-  static TextStyle get bodyLg => TextStyle(
-        fontFamily: _sans,
-        fontSize: 17,
-        height: 24 / 17,
-        fontWeight: FontWeight.w500,
-        color: VColors.contentDefault,
-      );
+  static TextStyle get bodyLg => _ui(
+      size: 17, height: 24, weight: FontWeight.w500, color: VColors.contentDefault);
 
-  static TextStyle get body => TextStyle(
-        fontFamily: _sans,
-        fontSize: 15,
-        height: 22 / 15,
-        fontWeight: FontWeight.w400,
-        color: VColors.contentDefault,
-      );
+  static TextStyle get body => _ui(
+      size: 15, height: 22, weight: FontWeight.w400, color: VColors.contentDefault);
 
-  static TextStyle get label => TextStyle(
-        fontFamily: _sans,
-        fontSize: 13,
-        height: 18 / 13,
-        fontWeight: FontWeight.w600,
-        color: VColors.contentDefault,
-      );
+  static TextStyle get label => _ui(
+      size: 13,
+      height: 18,
+      weight: FontWeight.w600,
+      letterSpacing: 0.1,
+      color: VColors.contentDefault);
 
-  static TextStyle get caption => TextStyle(
-        fontFamily: _sans,
-        fontSize: 12,
-        height: 16 / 12,
-        fontWeight: FontWeight.w500,
-        color: VColors.contentMuted,
-      );
+  static TextStyle get caption => _ui(
+      size: 12,
+      height: 16,
+      weight: FontWeight.w500,
+      letterSpacing: 0.2,
+      color: VColors.contentMuted);
 
   // mono-lg — plate / slot hero (22/28/600 mono)
-  static TextStyle get monoLg => TextStyle(
-        fontFamily: _mono,
-        fontFamilyFallback: _monoFallback,
-        fontSize: 22,
-        height: 28 / 22,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 1.5,
-        color: VColors.contentStrong,
-      );
+  static TextStyle get monoLg => _code(
+      size: 22,
+      height: 28,
+      weight: FontWeight.w600,
+      letterSpacing: 1.5,
+      color: VColors.contentStrong);
 
   // mono — timers, key codes, IDs (15/20/500 mono)
-  static TextStyle get mono => TextStyle(
-        fontFamily: _mono,
-        fontFamilyFallback: _monoFallback,
-        fontSize: 15,
-        height: 20 / 15,
-        fontWeight: FontWeight.w500,
-        color: VColors.contentMuted,
-      );
+  static TextStyle get mono => _code(
+      size: 15, height: 20, weight: FontWeight.w500, color: VColors.contentMuted);
 
   // Plate hero on the driver mission card — display size in mono.
-  static TextStyle get plateHero => TextStyle(
-        fontFamily: _mono,
-        fontFamilyFallback: _monoFallback,
-        fontSize: 44,
-        height: 48 / 44,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 4,
-        color: VColors.contentStrong,
-      );
+  static TextStyle get plateHero => _code(
+      size: 44,
+      height: 48,
+      weight: FontWeight.w700,
+      letterSpacing: 4,
+      color: VColors.contentStrong);
 }
 
 /// Shared ThemeData builder for both brightnesses. The per-mode colors come
@@ -185,7 +188,7 @@ ThemeData _buildValetTheme(Brightness brightness) {
     brightness: brightness,
     scaffoldBackgroundColor: VColors.surface900,
     canvasColor: VColors.surface900,
-    fontFamily: _sans,
+    fontFamily: GoogleFonts.inter().fontFamily,
     textTheme: textTheme,
     // Ripple/hover tints: brand-blue at low alpha (reads on paper and charcoal).
     splashColor: VColors.brand500.withValues(alpha: 0.12),
