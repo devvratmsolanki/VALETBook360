@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import HelpChatbot from '../assistant/HelpChatbot';
 
 const Layout = ({ children }) => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -29,6 +30,7 @@ const Layout = ({ children }) => {
                 <Header onMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)} />
                 <main className="p-6 lg:p-8">{children}</main>
             </div>
+            <HelpChatbot />
         </div>
     );
 };
