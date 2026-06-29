@@ -46,15 +46,25 @@ class TokenStore {
 
   Future<void> save(AuthSession session) async {
     // Memory first so the very next request is authenticated even if the
-    // (awaited) writes below are slow on web.
+    // (awaited) writes below are slow OR fail on web.
     _accessCache = session.accessToken;
     _refreshCache = session.refreshToken;
     _userCache = session.user;
-    await Future.wait([
-      _storage.write(key: _kAccess, value: session.accessToken),
-      _storage.write(key: _kRefresh, value: session.refreshToken),
-      _storage.write(key: _kUser, value: jsonEncode(session.user.toJson())),
-    ]);
+    // Best-effort persistence. `flutter_secure_storage` on web relies on
+    // SubtleCrypto, which the browser only exposes in a SECURE CONTEXT (HTTPS
+    // or localhost). Served over plain http on a LAN IP (e.g. phone testing),
+    // the write throws — but the in-memory cache above already holds the
+    // session, so login must NOT fail just because we couldn't persist it.
+    // Persistence simply degrades to "this tab only" until the app is on HTTPS.
+    try {
+      await Future.wait([
+        _storage.write(key: _kAccess, value: session.accessToken),
+        _storage.write(key: _kRefresh, value: session.refreshToken),
+        _storage.write(key: _kUser, value: jsonEncode(session.user.toJson())),
+      ]);
+    } catch (_) {
+      // Ignore — memory cache is the session's source of truth.
+    }
   }
 
   Future<String?> get accessToken async =>
@@ -79,10 +89,16 @@ class TokenStore {
     _accessCache = null;
     _refreshCache = null;
     _userCache = null;
-    await Future.wait([
-      _storage.delete(key: _kAccess),
-      _storage.delete(key: _kRefresh),
-      _storage.delete(key: _kUser),
-    ]);
+    // Best-effort (see note in [save]) — clearing the in-memory cache above is
+    // what actually signs the user out for this session.
+    try {
+      await Future.wait([
+        _storage.delete(key: _kAccess),
+        _storage.delete(key: _kRefresh),
+        _storage.delete(key: _kUser),
+      ]);
+    } catch (_) {
+      // Ignore — storage may be unavailable in a non-secure web context.
+    }
   }
 }

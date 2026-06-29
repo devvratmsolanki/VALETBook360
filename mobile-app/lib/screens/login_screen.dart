@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../state/providers.dart';
 import '../theme/motion.dart';
+import '../theme/v_breakpoints.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
@@ -91,7 +92,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: VSpace.x6),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
+                  constraints: BoxConstraints(
+                    maxWidth: context.responsive(compact: 420, expanded: 480),
+                  ),
                   child: Form(
                     key: _formKey,
                     child: Column(

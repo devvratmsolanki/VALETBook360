@@ -10,6 +10,7 @@ import '../models/lifecycle_status.dart';
 import '../models/transaction.dart';
 import '../state/company_detail_controller.dart';
 import '../state/providers.dart';
+import '../theme/v_breakpoints.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
@@ -180,8 +181,9 @@ class _Kpi extends StatelessWidget {
             const SizedBox(height: 2),
             Text(label,
                 textAlign: TextAlign.center,
-                style: VType.caption
-                    .copyWith(fontSize: 9, letterSpacing: 0.5)),
+                style: VType.caption.copyWith(
+                    fontSize: context.responsive(compact: 9, expanded: 11),
+                    letterSpacing: 0.5)),
           ],
         ),
       ),
@@ -310,8 +312,9 @@ class _KeySlotsTab extends ConsumerWidget {
                       padding: const EdgeInsets.fromLTRB(
                           VSpace.x4, 0, VSpace.x4, VSpace.x4),
                       gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
+                          SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: context.responsive(
+                            compact: 2, medium: 3, expanded: 4, large: 5),
                         mainAxisSpacing: VSpace.x2,
                         crossAxisSpacing: VSpace.x2,
                         childAspectRatio: 1.6,

@@ -1,0 +1,7 @@
+{
+  "_comment": "Web / desktop / iOS-sim against the local backend stack started via infra/docker-compose.yml. Host ports come from infra/.env (AUTH_PORT=8091, CORE_PORT=8092, GATEWAY_PORT=8090). Run: flutter run -d chrome --dart-define-from-file=config/local.json",
+  "AUTH_BASE_URL": "http://127.0.0.1:8091",
+  "CORE_BASE_URL": "http://127.0.0.1:8092",
+  "REALTIME_URL": "http://127.0.0.1:8090",
+  "API_TIMEOUT_MS": "20000"
+}

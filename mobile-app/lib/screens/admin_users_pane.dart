@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/admin_user.dart';
 import '../state/admin_users_controller.dart';
 import '../state/providers.dart';
+import '../theme/v_breakpoints.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../widgets/v_adaptive.dart';
 import '../widgets/v_states.dart';
 
 /// Hierarchical users pane (ADMIN) — re-platforms `Users.jsx`: a Super Admins
@@ -41,9 +43,10 @@ class AdminUsersPane extends ConsumerWidget {
           onRefresh: notifier.load,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            children: const [
-              SizedBox(height: 120),
-              VEmptyState(
+            children: [
+              SizedBox(
+                  height: context.responsive(compact: 80, expanded: 160)),
+              const VEmptyState(
                 icon: Icons.people_outline_rounded,
                 headline: 'No users yet',
                 hint: 'Users appear here as companies onboard staff.',
@@ -75,31 +78,43 @@ class AdminUsersPane extends ConsumerWidget {
         padding:
             const EdgeInsets.fromLTRB(VSpace.x4, VSpace.x4, VSpace.x4, VSpace.x6),
         children: [
-          if (superAdmins.isNotEmpty) ...[
-            _SectionLabel(label: 'Super Admins', count: superAdmins.length),
-            Container(
-              padding: const EdgeInsets.all(VSpace.x2),
-              decoration: BoxDecoration(
-                color: VColors.surface900,
-                borderRadius: BorderRadius.circular(VRadius.lg),
-                border: Border.all(color: VColors.surface700, width: 1),
-              ),
-              child: Column(
-                children: [
-                  for (final u in superAdmins) _UserRow(user: u),
+          VBoundedContent(
+            padding: EdgeInsets.zero,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (superAdmins.isNotEmpty) ...[
+                  _SectionLabel(
+                      label: 'Super Admins', count: superAdmins.length),
+                  Container(
+                    padding: const EdgeInsets.all(VSpace.x2),
+                    decoration: BoxDecoration(
+                      color: VColors.surface900,
+                      borderRadius: BorderRadius.circular(VRadius.lg),
+                      border: Border.all(color: VColors.surface700, width: 1),
+                    ),
+                    child: Column(
+                      children: [
+                        for (final u in superAdmins) _UserRow(user: u),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: VSpace.x5),
                 ],
-              ),
+                VResponsiveGrid(
+                  spacing: VSpace.x3,
+                  runSpacing: VSpace.x3,
+                  children: [
+                    for (final name in companyNames)
+                      _CompanyCard(
+                        name: name,
+                        users: byCompany[name]!,
+                      ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(height: VSpace.x5),
-          ],
-          for (final name in companyNames)
-            Padding(
-              padding: const EdgeInsets.only(bottom: VSpace.x3),
-              child: _CompanyCard(
-                name: name,
-                users: byCompany[name]!,
-              ),
-            ),
+          ),
         ],
       ),
     );

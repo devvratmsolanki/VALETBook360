@@ -6,26 +6,26 @@
 ///
 /// ## Pointing the app at a backend
 ///
-/// Defaults below target the **Android emulator**, where `10.0.2.2` is the host
-/// machine's loopback. Override per environment without editing code:
+/// The local stack (infra/docker-compose.yml) publishes the services on the host
+/// ports chosen in infra/.env — by default AUTH=8091, CORE=8092, GATEWAY=8090
+/// (NOT 8081/8082; those are the in-container ports). The defaults below target
+/// the **Android emulator** (`10.0.2.2` = host loopback). For every other target,
+/// pass a committed config file instead of hand-typing flags:
 ///
 /// ```sh
-/// # Android emulator (default — no flags needed)
+/// # Android emulator (default — no flags needed; uses 10.0.2.2)
 /// flutter run
 ///
-/// # iOS simulator / desktop / web  → host loopback is 127.0.0.1
-/// flutter run \
-///   --dart-define=AUTH_BASE_URL=http://127.0.0.1:8081 \
-///   --dart-define=CORE_BASE_URL=http://127.0.0.1:8082
+/// # Web / desktop / iOS-sim against the local stack (127.0.0.1:809x)
+/// flutter run -d chrome --dart-define-from-file=config/local.json
 ///
-/// # Physical device on the same LAN  → your machine's IP
-/// flutter run \
-///   --dart-define=AUTH_BASE_URL=http://192.168.1.20:8081 \
-///   --dart-define=CORE_BASE_URL=http://192.168.1.20:8082
+/// # Physical device on the same Wi-Fi: copy config/lan.example.json →
+/// # config/lan.json, set your LAN IP, then:
+/// flutter run -d chrome --web-hostname 0.0.0.0 \
+///   --dart-define-from-file=config/lan.json
 ///
-/// # Remote / staging
-/// flutter run \
-///   --dart-define=AUTH_BASE_URL=https://auth.staging.valet.app \
+/// # Remote / staging: a config/staging.json with https URLs, or per-define:
+/// flutter run --dart-define=AUTH_BASE_URL=https://auth.staging.valet.app \
 ///   --dart-define=CORE_BASE_URL=https://core.staging.valet.app
 /// ```
 class ApiConfig {

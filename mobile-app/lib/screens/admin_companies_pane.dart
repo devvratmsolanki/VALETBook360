@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/company.dart';
 import '../state/companies_controller.dart';
 import '../state/providers.dart';
+import '../theme/v_breakpoints.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../widgets/v_adaptive.dart';
 import '../widgets/v_states.dart';
 import 'admin_company_create_screen.dart';
 import 'admin_company_detail_screen.dart';
@@ -79,9 +81,10 @@ class AdminCompaniesPane extends ConsumerWidget {
           onRefresh: notifier.load,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            children: const [
-              SizedBox(height: 120),
-              VEmptyState(
+            children: [
+              SizedBox(
+                  height: context.responsive(compact: 80, expanded: 160)),
+              const VEmptyState(
                 icon: Icons.business_outlined,
                 headline: 'No companies yet',
                 hint: 'Tap “New company” to provision the first one.',
@@ -94,13 +97,22 @@ class AdminCompaniesPane extends ConsumerWidget {
           color: VColors.brand400,
           backgroundColor: VColors.surface800,
           onRefresh: notifier.load,
-          child: ListView.separated(
+          child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(
                 VSpace.x4, VSpace.x4, VSpace.x4, 96),
-            itemCount: state.companies.length,
-            separatorBuilder: (_, __) => const SizedBox(height: VSpace.x3),
-            itemBuilder: (_, i) => _CompanyCard(company: state.companies[i]),
+            children: [
+              VBoundedContent(
+                padding: EdgeInsets.zero,
+                child: VResponsiveGrid(
+                  spacing: VSpace.x3,
+                  runSpacing: VSpace.x3,
+                  children: [
+                    for (final c in state.companies) _CompanyCard(company: c),
+                  ],
+                ),
+              ),
+            ],
           ),
         );
     }

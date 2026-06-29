@@ -8,6 +8,7 @@ import '../models/lifecycle_status.dart';
 import '../models/transaction.dart';
 import '../state/company_detail_controller.dart';
 import '../state/providers.dart';
+import '../theme/v_breakpoints.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
@@ -231,16 +232,22 @@ class _DashboardTab extends ConsumerWidget {
         return RefreshIndicator(
           color: VColors.brand400,
           onRefresh: () async => ref.invalidate(companyHistoryProvider),
-          child: ListView(
+          child: Center(
+            child: ConstrainedBox(
+              constraints:
+                  BoxConstraints(maxWidth: context.dashboardMaxWidth),
+              child: ListView(
             padding: const EdgeInsets.all(VSpace.x4),
             children: [
               GridView.count(
-                crossAxisCount: 2,
+                crossAxisCount:
+                    context.responsive(compact: 2, expanded: 3, large: 4),
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 mainAxisSpacing: VSpace.x3,
                 crossAxisSpacing: VSpace.x3,
-                childAspectRatio: 1.7,
+                childAspectRatio:
+                    context.responsive(compact: 1.7, expanded: 2.0, large: 2.2),
                 children: [for (final s in stats) _StatCard(data: s)],
               ),
               const SizedBox(height: VSpace.x6),
@@ -260,6 +267,8 @@ class _DashboardTab extends ConsumerWidget {
               else
                 for (final tx in active) _ActiveRow(tx: tx),
             ],
+              ),
+            ),
           ),
         );
       },
@@ -368,11 +377,18 @@ class _TransactionsTab extends ConsumerWidget {
         return RefreshIndicator(
           color: VColors.brand400,
           onRefresh: () async => ref.invalidate(companyHistoryProvider),
-          child: ListView.separated(
-            padding: const EdgeInsets.all(VSpace.x4),
-            itemCount: all.length,
-            separatorBuilder: (_, __) => const SizedBox(height: VSpace.x2),
-            itemBuilder: (_, i) => _TxRow(tx: all[i]),
+          child: Center(
+            child: ConstrainedBox(
+              constraints:
+                  BoxConstraints(maxWidth: context.dashboardMaxWidth),
+              child: ListView.separated(
+                padding: const EdgeInsets.all(VSpace.x4),
+                itemCount: all.length,
+                separatorBuilder: (_, __) =>
+                    const SizedBox(height: VSpace.x2),
+                itemBuilder: (_, i) => _TxRow(tx: all[i]),
+              ),
+            ),
           ),
         );
       },

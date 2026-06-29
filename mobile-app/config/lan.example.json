@@ -1,0 +1,7 @@
+{
+  "_comment": "Physical device (phone/tablet) on the same Wi-Fi as the dev machine. Copy to config/lan.json and replace 192.168.1.20 with your machine's LAN IP (macOS: `ipconfig getifaddr en0`). The backend already allows LAN origins via CORS_ALLOWED_ORIGINS in infra/.env — keep that in sync with your IP. Run: flutter run -d chrome --web-hostname 0.0.0.0 --dart-define-from-file=config/lan.json",
+  "AUTH_BASE_URL": "http://192.168.1.20:8091",
+  "CORE_BASE_URL": "http://192.168.1.20:8092",
+  "REALTIME_URL": "http://192.168.1.20:8090",
+  "API_TIMEOUT_MS": "20000"
+}

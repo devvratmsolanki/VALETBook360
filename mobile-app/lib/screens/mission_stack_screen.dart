@@ -6,6 +6,7 @@ import '../models/lifecycle_status.dart';
 import '../state/missions_controller.dart';
 import '../state/providers.dart';
 import '../theme/motion.dart';
+import '../theme/v_breakpoints.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
@@ -13,6 +14,7 @@ import '../widgets/app_logo.dart';
 import '../widgets/mission_card.dart';
 import '../widgets/success_burst.dart';
 import '../widgets/theme_toggle_button.dart';
+import '../widgets/v_adaptive.dart';
 import '../widgets/v_states.dart';
 
 /// 7.5 Driver — Mission Stack (home). Active mission full-bleed with the
@@ -178,9 +180,10 @@ class _MissionStackScreenState extends ConsumerState<MissionStackScreen> {
               ref.read(missionsControllerProvider.notifier).load(silent: true),
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            children: const [
-              SizedBox(height: 120),
-              VEmptyState(
+            children: [
+              SizedBox(
+                  height: context.responsive(compact: 80, expanded: 160)),
+              const VEmptyState(
                 icon: Icons.task_alt_rounded,
                 headline: "No tasks — you're all caught up",
                 hint: 'Pull down to refresh',
@@ -217,7 +220,10 @@ class _MissionStackScreenState extends ConsumerState<MissionStackScreen> {
                   VSpace.x4,
                   VSpace.x4,
                 ),
-                child: Stack(
+                child: VBoundedContent(
+                  maxWidth: 640,
+                  padding: EdgeInsets.zero,
+                  child: Stack(
                   alignment: Alignment.topCenter,
                   children: [
                     // Up-next peek (scale 0.94, dimmed) behind the active card.
@@ -270,6 +276,7 @@ class _MissionStackScreenState extends ConsumerState<MissionStackScreen> {
                       ),
                     ),
                   ],
+                ),
                 ),
               ),
             ),

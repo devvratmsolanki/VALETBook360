@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/admin_location.dart';
 import '../state/company_detail_controller.dart';
 import '../state/providers.dart';
+import '../theme/v_breakpoints.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
 import '../widgets/app_logo.dart';
+import '../widgets/v_adaptive.dart';
 import '../widgets/v_states.dart';
 import 'admin_location_create_screen.dart';
 import 'admin_staff_create_screen.dart';
@@ -127,9 +129,11 @@ class _OverviewTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = state.company;
-    return ListView(
-      padding: const EdgeInsets.all(VSpace.x4),
-      children: [
+    return VBoundedContent(
+      padding: EdgeInsets.zero,
+      child: ListView(
+        padding: const EdgeInsets.all(VSpace.x4),
+        children: [
         _StatRow(
           stats: [
             _Stat('Locations', state.locations.length),
@@ -145,7 +149,8 @@ class _OverviewTab extends StatelessWidget {
             _InfoRow('Phone', c?.phone ?? '—'),
           ],
         ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -185,28 +190,31 @@ class _LocationsTab extends ConsumerWidget {
 
     return Stack(
       children: [
-        ListView.separated(
-          padding: const EdgeInsets.fromLTRB(
-              VSpace.x4, VSpace.x4, VSpace.x4, 96),
-          itemCount: state.locations.length,
-          separatorBuilder: (_, __) => const SizedBox(height: VSpace.x3),
-          itemBuilder: (_, i) {
-            final loc = state.locations[i];
-            return _Tile(
-              leading: Icons.place_rounded,
-              title: loc.name,
-              subtitle: loc.locationLine.isNotEmpty
-                  ? loc.locationLine
-                  : '${loc.keyCapacity} key slots',
-              trailing: IconButton(
-                tooltip: 'Edit',
-                icon: Icon(Icons.edit_outlined,
-                    size: 20, color: VColors.contentMuted),
-                onPressed: () => edit(loc),
-              ),
-              badge: '${loc.keyCapacity} keys',
-            );
-          },
+        VBoundedContent(
+          padding: EdgeInsets.zero,
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(
+                VSpace.x4, VSpace.x4, VSpace.x4, 96),
+            itemCount: state.locations.length,
+            separatorBuilder: (_, __) => const SizedBox(height: VSpace.x3),
+            itemBuilder: (_, i) {
+              final loc = state.locations[i];
+              return _Tile(
+                leading: Icons.place_rounded,
+                title: loc.name,
+                subtitle: loc.locationLine.isNotEmpty
+                    ? loc.locationLine
+                    : '${loc.keyCapacity} key slots',
+                trailing: IconButton(
+                  tooltip: 'Edit',
+                  icon: Icon(Icons.edit_outlined,
+                      size: 20, color: VColors.contentMuted),
+                  onPressed: () => edit(loc),
+                ),
+                badge: '${loc.keyCapacity} keys',
+              );
+            },
+          ),
         ),
         _AddFab(label: 'Add location', onPressed: add),
       ],
@@ -257,24 +265,27 @@ class _PeopleTab extends ConsumerWidget {
 
     return Stack(
       children: [
-        ListView.separated(
-          padding: const EdgeInsets.fromLTRB(
-              VSpace.x4, VSpace.x4, VSpace.x4, 96),
-          itemCount: people.length,
-          separatorBuilder: (_, __) => const SizedBox(height: VSpace.x3),
-          itemBuilder: (_, i) {
-            final u = people[i];
-            return _Tile(
-              leading: isDriver
-                  ? Icons.person_pin_circle_rounded
-                  : Icons.badge_rounded,
-              title: u.displayName,
-              subtitle: u.email,
-              badge: u.active ? 'Active' : 'Inactive',
-              badgeColor:
-                  u.active ? VColors.alertSuccess : VColors.contentFaint,
-            );
-          },
+        VBoundedContent(
+          padding: EdgeInsets.zero,
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(
+                VSpace.x4, VSpace.x4, VSpace.x4, 96),
+            itemCount: people.length,
+            separatorBuilder: (_, __) => const SizedBox(height: VSpace.x3),
+            itemBuilder: (_, i) {
+              final u = people[i];
+              return _Tile(
+                leading: isDriver
+                    ? Icons.person_pin_circle_rounded
+                    : Icons.badge_rounded,
+                title: u.displayName,
+                subtitle: u.email,
+                badge: u.active ? 'Active' : 'Inactive',
+                badgeColor:
+                    u.active ? VColors.alertSuccess : VColors.contentFaint,
+              );
+            },
+          ),
         ),
         _AddFab(label: 'Add $noun', onPressed: add),
       ],
@@ -358,7 +369,7 @@ class _InfoCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
-                  width: 80,
+                  width: context.responsive(compact: 70, expanded: 120),
                   child: Text(rows[i].label, style: VType.caption),
                 ),
                 Expanded(

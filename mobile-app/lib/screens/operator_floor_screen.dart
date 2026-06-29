@@ -9,11 +9,13 @@ import '../state/drivers_controller.dart';
 import '../state/floor_controller.dart';
 import '../state/providers.dart';
 import '../theme/motion.dart';
+import '../theme/v_breakpoints.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/theme_toggle_button.dart';
+import '../widgets/v_adaptive.dart';
 import '../widgets/v_chips.dart';
 import '../widgets/v_primary_button.dart';
 import '../widgets/v_states.dart';
@@ -139,9 +141,10 @@ class OperatorFloorScreen extends ConsumerWidget {
               ref.read(floorControllerProvider.notifier).load(silent: true),
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            children: const [
-              SizedBox(height: 120),
-              VEmptyState(
+            children: [
+              SizedBox(
+                  height: context.responsive(compact: 80, expanded: 160)),
+              const VEmptyState(
                 icon: Icons.local_parking_rounded,
                 headline: 'The floor is clear',
                 hint: 'Tap “New car” to check a vehicle in',
@@ -163,32 +166,35 @@ class OperatorFloorScreen extends ConsumerWidget {
           .toList();
       if (items.isEmpty) continue;
       children.add(_GroupHeader(label: bucket.label, count: items.length));
-      for (final tx in items) {
-        children.add(
-          Padding(
-            key: ValueKey('card-${tx.id}'),
-            padding: const EdgeInsets.only(bottom: VSpace.x3),
-            child: AnimatedSwitcher(
-              duration: Motion.duration(context, VMotion.stateAdvance),
-              switchInCurve: VMotion.emphasizedDecelerate,
-              transitionBuilder: (child, anim) => FadeTransition(
-                opacity: anim,
-                child: SizeTransition(
-                  sizeFactor: anim,
-                  axisAlignment: -1,
-                  child: child,
+      children.add(
+        VResponsiveGrid(
+          spacing: VSpace.x3,
+          runSpacing: VSpace.x3,
+          children: [
+            for (final tx in items)
+              AnimatedSwitcher(
+                key: ValueKey('card-${tx.id}'),
+                duration: Motion.duration(context, VMotion.stateAdvance),
+                switchInCurve: VMotion.emphasizedDecelerate,
+                transitionBuilder: (child, anim) => FadeTransition(
+                  opacity: anim,
+                  child: SizeTransition(
+                    sizeFactor: anim,
+                    axisAlignment: -1,
+                    child: child,
+                  ),
+                ),
+                child: _FloorCard(
+                  key: ValueKey('${tx.id}:${tx.status.wire}'),
+                  tx: tx,
+                  busy: floor.busyId == tx.id,
+                  onAction: (a) => _runAction(context, ref, tx, a),
                 ),
               ),
-              child: _FloorCard(
-                key: ValueKey('${tx.id}:${tx.status.wire}'),
-                tx: tx,
-                busy: floor.busyId == tx.id,
-                onAction: (a) => _runAction(context, ref, tx, a),
-              ),
-            ),
-          ),
-        );
-      }
+          ],
+        ),
+      );
+      children.add(const SizedBox(height: VSpace.x3));
     }
 
     return RefreshIndicator(

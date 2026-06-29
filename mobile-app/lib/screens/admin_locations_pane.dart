@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/admin_location.dart';
 import '../state/admin_locations_controller.dart';
 import '../state/providers.dart';
+import '../theme/v_breakpoints.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../widgets/v_adaptive.dart';
 import '../widgets/v_states.dart';
 import 'admin_location_create_screen.dart';
 
@@ -42,9 +44,10 @@ class AdminLocationsPane extends ConsumerWidget {
           onRefresh: notifier.load,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            children: const [
-              SizedBox(height: 120),
-              VEmptyState(
+            children: [
+              SizedBox(
+                  height: context.responsive(compact: 80, expanded: 160)),
+              const VEmptyState(
                 icon: Icons.location_off_outlined,
                 headline: 'No locations yet',
                 hint: 'Locations appear here as companies add them.',
@@ -88,20 +91,31 @@ class AdminLocationsPane extends ConsumerWidget {
         padding:
             const EdgeInsets.fromLTRB(VSpace.x4, VSpace.x4, VSpace.x4, VSpace.x6),
         children: [
-          for (final name in companyNames) ...[
-            _CompanyGroupHeader(
-              name: name,
-              count: groups[name]!.length,
-              onAdd: () => add(groups[name]!.first.companyId),
+          VBoundedContent(
+            padding: EdgeInsets.zero,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final name in companyNames) ...[
+                  _CompanyGroupHeader(
+                    name: name,
+                    count: groups[name]!.length,
+                    onAdd: () => add(groups[name]!.first.companyId),
+                  ),
+                  VResponsiveGrid(
+                    spacing: VSpace.x3,
+                    runSpacing: VSpace.x3,
+                    children: [
+                      for (final loc in groups[name]!)
+                        _LocationRow(
+                            location: loc, onEdit: () => edit(loc)),
+                    ],
+                  ),
+                  const SizedBox(height: VSpace.x4),
+                ],
+              ],
             ),
-            for (final loc in groups[name]!) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: VSpace.x3),
-                child: _LocationRow(location: loc, onEdit: () => edit(loc)),
-              ),
-            ],
-            const SizedBox(height: VSpace.x4),
-          ],
+          ),
         ],
       ),
     );
