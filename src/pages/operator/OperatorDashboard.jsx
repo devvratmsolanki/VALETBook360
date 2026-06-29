@@ -20,9 +20,10 @@ import { findCarByNumber, createCar } from '../../services/carService';
 import { createTransaction, getActiveTransactions, subscribeToTransactions, updateTransactionStatus, assignDriverForRetrieval, confirmKeyIn, getNextAvailableKeySlot } from '../../services/transactionService';
 import { getDriversByCompany } from '../../services/driverService';
 import { getLocationsByCompany } from '../../services/locationService';
+import { getLocationSlotNames } from '../../services/slotService';
 import { sendDriverAssigned, sendCarReady, sendCarDelivered } from '../../services/webhookService';
 import { uploadMultiplePhotos } from '../../services/storageService';
-import { parseUTC } from '../../lib/utils';
+import { parseUTC, cn } from '../../lib/utils';
 import logger from '../../lib/logger';
 
 // ─── Live Timer Component ───
@@ -76,6 +77,7 @@ const OperatorDashboard = () => {
     const [loading, setLoading] = useState(false);
     const [isReturning, setIsReturning] = useState(false);
     const [keyCode, setKeyCode] = useState('');
+    const [slotNames, setSlotNames] = useState([]);
     const [locationCapacity, setLocationCapacity] = useState(0);
     const [qrModal, setQrModal] = useState(null);
     const [checkinStep, setCheckinStep] = useState(1);
@@ -115,10 +117,16 @@ const OperatorDashboard = () => {
             setLocations(locationList);
 
             if (activeLocationId) {
-                const nextSlot = await getNextAvailableKeySlot(activeLocationId);
+                const [names, nextSlot] = await Promise.all([
+                    getLocationSlotNames(activeLocationId),
+                    getNextAvailableKeySlot(activeLocationId),
+                ]);
+                setSlotNames(names);
                 if (nextSlot) setKeyCode(nextSlot);
                 const loc = locationList.find(l => l.id === activeLocationId);
                 if (loc) setLocationCapacity(loc.key_capacity || 0);
+            } else {
+                setSlotNames([]);
             }
         } catch (err) {
             logger.error('Fetch error:', err);
@@ -158,7 +166,11 @@ const OperatorDashboard = () => {
             try {
                 const loc = locations.find(l => l.id === val);
                 if (loc) setLocationCapacity(loc.key_capacity || 0);
-                const nextSlot = await getNextAvailableKeySlot(val);
+                const [names, nextSlot] = await Promise.all([
+                    getLocationSlotNames(val),
+                    getNextAvailableKeySlot(val),
+                ]);
+                setSlotNames(names);
                 if (nextSlot) {
                     setKeyCode(nextSlot);
                 } else {
@@ -170,6 +182,7 @@ const OperatorDashboard = () => {
             }
         } else {
             setLocationCapacity(0);
+            setSlotNames([]);
             setKeyCode('');
         }
     };
@@ -255,6 +268,10 @@ const OperatorDashboard = () => {
         if (e) e.preventDefault();
         if (!selectedDriver) return toast.error('Please select a driver');
         if (!keyCode) return toast.error('Please assign a key slot');
+        if (occupiedSlots.has(keyCode)) {
+            fetchAll();
+            return toast.error(`Slot ${keyCode} was just taken — please pick another`);
+        }
 
         setLoading(true);
         try {
@@ -288,7 +305,10 @@ const OperatorDashboard = () => {
             setCheckinPhotoFiles([]);
             fetchAll();
         } catch (err) {
-            toast.error(err.message || 'Processing failed');
+            // A duplicate-slot race surfaces here — refresh occupancy so the
+            // grid greys out the now-taken slot before the operator retries.
+            fetchAll();
+            toast.error(err.userMessage || err.message || 'Processing failed');
         } finally { setLoading(false); }
     };
 
@@ -397,6 +417,24 @@ const OperatorDashboard = () => {
             },
         };
     }, [transactions]);
+
+    // ─── Occupied key slots for the active location ───
+    // Active = anything not delivered/cancelled. Excludes the in-progress
+    // check-in (currentTxId) which hasn't been assigned a slot yet.
+    const occupiedSlots = useMemo(() => {
+        const set = new Set();
+        for (const t of transactions) {
+            if (
+                t.location_id === activeLocationId &&
+                t.id !== currentTxId &&
+                t.key_code &&
+                !['delivered', 'cancelled'].includes(t.status)
+            ) {
+                set.add(t.key_code);
+            }
+        }
+        return set;
+    }, [transactions, activeLocationId, currentTxId]);
 
     const locationOptions = [{ value: '', label: 'Select location...' }, ...locations.map(l => ({ value: l.id, label: l.name }))];
 
@@ -622,30 +660,53 @@ const OperatorDashboard = () => {
                                     <p className="text-sm font-bold text-white mt-1">{carNumber} • {name}</p>
                                 </div>
 
-                                {/* Key Code */}
-                                <div className="space-y-1">
+                                {/* Key Slot Grid — auto-default to lowest free, click to override */}
+                                <div className="space-y-2">
                                     <label className="flex items-center justify-between text-xs font-medium text-gray-300">
-                                        <span className="flex items-center gap-2">🔑 Key Code <span className="text-red-400">*</span></span>
-                                        {locationCapacity > 0 && <span className="text-[10px] text-gray-500 font-normal">Total Slots: {locationCapacity}</span>}
-                                    </label>
-                                    <div className="flex gap-2">
-                                        <div className={`flex-1 flex items-center gap-3 rounded-xl border p-2.5 transition-all ${keyCode ? 'bg-brand-500/5 border-brand-500/30' : 'bg-dark-600 border-white/5'}`}>
-                                            <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-sm font-bold border ${keyCode ? 'bg-brand-500 text-black border-brand-400 shadow-lg shadow-brand-500/20' : 'bg-dark-700 text-gray-600 border-white/5'}`}>
-                                                {keyCode || '?'}
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className={`text-sm font-medium ${keyCode ? 'text-brand-400' : 'text-gray-500'}`}>
-                                                    {keyCode ? `Assigned Slot #${keyCode}` : 'Detecting Slot...'}
-                                                </p>
-                                                <p className="text-[10px] text-gray-600">Auto-filled based on capacity</p>
-                                            </div>
+                                        <span className="flex items-center gap-2">🔑 Key Slot <span className="text-red-400">*</span></span>
+                                        <span className="flex items-center gap-2 text-[10px] font-normal text-gray-500">
+                                            {keyCode ? <span className="text-brand-400 font-semibold">Selected: {keyCode}</span> : 'Pick a slot'}
+                                            {slotNames.length > 0 && <span>• {slotNames.length} total</span>}
                                             {selectedLocationId && (
-                                                <button type="button" onClick={() => handleLocationChange(selectedLocationId)} className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors" title="Re-calculate slot">
-                                                    <RefreshCw className="h-3.5 w-3.5" />
+                                                <button type="button" onClick={() => handleLocationChange(selectedLocationId)} className="p-1 rounded-md hover:bg-white/5 text-gray-500 hover:text-white transition-colors" title="Refresh slots & re-pick default">
+                                                    <RefreshCw className="h-3 w-3" />
                                                 </button>
                                             )}
+                                        </span>
+                                    </label>
+                                    {slotNames.length === 0 ? (
+                                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-400">
+                                            No key slots configured for this location. Set a key capacity or add slots from the location settings.
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="grid grid-cols-5 sm:grid-cols-6 gap-1.5 max-h-44 overflow-y-auto pr-1 scrollbar-thin rounded-xl border border-white/5 bg-dark-700/40 p-2">
+                                            {slotNames.map((slotName) => {
+                                                const isOccupied = occupiedSlots.has(slotName);
+                                                const isSelected = keyCode === slotName;
+                                                return (
+                                                    <button
+                                                        key={slotName}
+                                                        type="button"
+                                                        disabled={isOccupied}
+                                                        onClick={() => setKeyCode(slotName)}
+                                                        aria-label={`Key slot ${slotName}${isOccupied ? ' (occupied)' : isSelected ? ' (selected)' : ' (free)'}`}
+                                                        aria-pressed={isSelected}
+                                                        title={isOccupied ? `Slot ${slotName} is occupied` : `Assign slot ${slotName}`}
+                                                        className={cn(
+                                                            'aspect-square rounded-lg border text-xs font-bold flex items-center justify-center px-1 truncate transition-all',
+                                                            isOccupied
+                                                                ? 'bg-dark-700 border-white/5 text-gray-600 opacity-40 cursor-not-allowed line-through'
+                                                                : isSelected
+                                                                    ? 'bg-brand-500 text-black border-brand-400 shadow-lg shadow-brand-500/20 scale-105'
+                                                                    : 'bg-dark-600 border-white/5 text-gray-300 hover:border-brand-500/40 hover:text-brand-400'
+                                                        )}
+                                                    >
+                                                        {slotName}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Driver Select */}

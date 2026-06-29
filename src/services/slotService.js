@@ -11,6 +11,27 @@ export const getSlotsByLocation = async (locationId) => {
     return data || [];
 };
 
+/**
+ * Returns the ORDERED list of slot names for a location: custom key_slots
+ * (by sort_order) if any exist, otherwise numeric "1".."key_capacity".
+ * Mirrors the allocation logic in transactionService.getNextAvailableKeySlot
+ * so the operator grid and the auto-default agree on the pool.
+ */
+export const getLocationSlotNames = async (locationId) => {
+    if (!locationId) return [];
+    const slots = await getSlotsByLocation(locationId);
+    if (slots && slots.length > 0) return slots.map(s => s.slot_name);
+
+    const { data: loc, error } = await supabase
+        .from('locations')
+        .select('key_capacity')
+        .eq('id', locationId)
+        .single();
+    if (error) throw error;
+    const capacity = loc?.key_capacity || 0;
+    return Array.from({ length: capacity }, (_, i) => (i + 1).toString());
+};
+
 export const createSlot = async (slotData) => {
     const mapped = {
         location_id: slotData.locationId || slotData.location_id,

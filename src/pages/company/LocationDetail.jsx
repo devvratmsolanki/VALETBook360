@@ -10,7 +10,7 @@ import { toast } from '../../components/ui/Toast';
 import { formatTime, formatDate } from '../../lib/utils';
 import { MapPin, ArrowLeft, UserCheck, Car, Clock, Building2, Phone, Mail, Edit, Key, Plus, Trash2, Check, X, RefreshCw, Activity } from 'lucide-react';
 import { updateLocation } from '../../services/locationService';
-import { getSlotsByLocation, updateSlotName, deleteSlot, bulkGenerateSlots } from '../../services/slotService';
+import { getSlotsByLocation, updateSlotName, deleteSlot, bulkGenerateSlots, clearAllSlots, syncSlotsWithCapacity } from '../../services/slotService';
 import { getDriversByCompany } from '../../services/driverService';
 import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
@@ -101,6 +101,23 @@ const LocationDetail = () => {
             setShowBulkModal(false);
         } catch (err) {
             toast.error(err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleGenerateDefaults = async () => {
+        const capacity = parseInt(location?.key_capacity) || 0;
+        if (capacity <= 0) return toast.error('Set a key capacity first (Edit Location).');
+        if (slots.length > 0 && !confirm(`Reset to default numbered slots 1..${capacity}? Custom labels will be replaced.`)) return;
+        setSaving(true);
+        try {
+            await clearAllSlots(locationId);
+            await syncSlotsWithCapacity(locationId, capacity);
+            setSlots(await getSlotsByLocation(locationId));
+            toast.success(`Generated ${capacity} default slots`);
+        } catch (err) {
+            toast.error(err.userMessage || err.message);
         } finally {
             setSaving(false);
         }
@@ -217,9 +234,14 @@ const LocationDetail = () => {
                                 <p className="text-sm font-medium text-white">Advanced Key Management</p>
                                 <p className="text-xs text-gray-500">Define custom labels for your key storage (e.g. VIP-1, Box A)</p>
                             </div>
-                            <Button size="sm" onClick={() => setShowBulkModal(true)}>
-                                <Plus className="h-4 w-4 mr-1.5" /> Bulk Setup
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button size="sm" variant="outline" onClick={handleGenerateDefaults} disabled={saving} title="Generate numbered slots 1..N from key capacity">
+                                    <RefreshCw className="h-4 w-4 mr-1.5" /> Generate 1..N
+                                </Button>
+                                <Button size="sm" onClick={() => setShowBulkModal(true)}>
+                                    <Plus className="h-4 w-4 mr-1.5" /> Bulk Setup
+                                </Button>
+                            </div>
                         </div>
 
                         {slots.length === 0 ? (
@@ -227,7 +249,10 @@ const LocationDetail = () => {
                                 <Key className="h-12 w-12 text-gray-700 mx-auto mb-4" />
                                 <p className="text-white font-bold">Standard Numbering Active</p>
                                 <p className="text-sm text-gray-500 mt-1 mb-8">Currently using generic slots 1 through {location?.key_capacity || 0}</p>
-                                <Button variant="outline" onClick={() => setShowBulkModal(true)} className="rounded-xl px-8 border-brand-500/30 text-brand-400 hover:bg-brand-500/10">Setup Custom Labels</Button>
+                                <div className="flex items-center justify-center gap-3 flex-wrap">
+                                    <Button onClick={handleGenerateDefaults} disabled={saving} className="rounded-xl px-8 bg-brand-500 text-black shadow-lg shadow-brand-500/20">Generate Default Slots</Button>
+                                    <Button variant="outline" onClick={() => setShowBulkModal(true)} className="rounded-xl px-8 border-brand-500/30 text-brand-400 hover:bg-brand-500/10">Setup Custom Labels</Button>
+                                </div>
                             </Card>
                         ) : (
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
