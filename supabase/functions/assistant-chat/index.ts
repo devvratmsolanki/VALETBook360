@@ -1,14 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// LogBook360 in-app help assistant. Proxies a short, app-aware chat to the
-// Google Gemini API (free tier — key from https://aistudio.google.com, no card).
-// The GEMINI_API_KEY lives ONLY here (a Supabase secret) — never in the browser.
-// Every call is JWT-verified so this is not an open relay, and the conversation
-// is bounded to keep cost/abuse in check.
+// LogBook360 in-app help assistant. Proxies a short, app-aware chat to Groq's
+// OpenAI-compatible chat-completions API (free, no card — key from
+// https://console.groq.com). The GROQ_API_KEY lives ONLY here (a Supabase
+// secret) — never in the browser. Every call is JWT-verified, and the
+// conversation is bounded.
 //
 // Set the secret before deploying:
-//   supabase secrets set GEMINI_API_KEY=AIza...
-//   (optional) supabase secrets set ASSISTANT_MODEL=gemini-2.0-flash
+//   supabase secrets set GROQ_API_KEY=gsk_...
+//   (optional) supabase secrets set ASSISTANT_MODEL=llama-3.3-70b-versatile
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,7 +16,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const MAX_TURNS = 20;
 const MAX_CHARS = 4000;
 
@@ -59,12 +59,11 @@ Deno.serve(async (req: Request) => {
     });
 
   try {
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
+    const apiKey = Deno.env.get("GROQ_API_KEY");
     if (!apiKey) {
-      return json({ error: "The help assistant isn't configured yet. Set GEMINI_API_KEY." }, 503);
+      return json({ error: "The help assistant isn't configured yet. Set GROQ_API_KEY." }, 503);
     }
 
-    // --- AuthN: require a valid Supabase session (any authenticated role) ---
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ error: "No authorization header" }, 401);
 
@@ -77,7 +76,6 @@ Deno.serve(async (req: Request) => {
     );
     if (authError || !user) return json({ error: "Invalid token" }, 401);
 
-    // Derive the role server-side from the DB — never trust a client-supplied role.
     const { data: profile } = await supabase
       .from("users")
       .select("role, name")
@@ -86,41 +84,31 @@ Deno.serve(async (req: Request) => {
     const role = profile?.role ?? "";
     const name = profile?.name ?? null;
 
-    // --- Validate + clamp the incoming conversation (Gemini roles: user|model) ---
     const body = await req.json().catch(() => null);
     const rawMessages = Array.isArray(body?.messages) ? body.messages : null;
     if (!rawMessages || rawMessages.length === 0) {
       return json({ error: "messages[] is required" }, 400);
     }
-    const contents = rawMessages
+    const turns = rawMessages
       .slice(-MAX_TURNS)
       .filter((m: any) => (m?.role === "user" || m?.role === "assistant") && typeof m?.content === "string" && m.content.trim())
-      .map((m: any) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: String(m.content).slice(0, MAX_CHARS) }],
-      }));
-    if (contents.length === 0 || contents[contents.length - 1].role !== "user") {
+      .map((m: any) => ({ role: m.role, content: String(m.content).slice(0, MAX_CHARS) }));
+    if (turns.length === 0 || turns[turns.length - 1].role !== "user") {
       return json({ error: "The last message must be from the user." }, 400);
     }
 
-    const model = Deno.env.get("ASSISTANT_MODEL") || "gemini-2.0-flash";
+    const model = Deno.env.get("ASSISTANT_MODEL") || "llama-3.3-70b-versatile";
+    const messages = [{ role: "system", content: systemPrompt(role, name) }, ...turns];
 
-    const upstream = await fetch(
-      `${GEMINI_BASE}${encodeURIComponent(model)}:generateContent`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt(role, name) }] },
-          contents,
-          generationConfig: { maxOutputTokens: 1024, temperature: 0.4 },
-        }),
-      },
-    );
+    const upstream = await fetch(GROQ_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages, max_tokens: 1024, temperature: 0.4 }),
+    });
 
     if (!upstream.ok) {
       const detail = await upstream.text();
-      console.error("Gemini error", upstream.status, detail);
+      console.error("Groq error", upstream.status, detail);
       const msg = upstream.status === 429
         ? "The assistant is busy right now — please try again in a moment."
         : "The assistant couldn't respond right now. Please try again.";
@@ -128,16 +116,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const data = await upstream.json();
-    if (data?.promptFeedback?.blockReason) {
-      return json({ reply: "I can't help with that one — I'm here for questions about using LogBook360." });
-    }
-    const cand = data?.candidates?.[0];
-    const reply = Array.isArray(cand?.content?.parts)
-      ? cand.content.parts.map((p: any) => p?.text ?? "").join("").trim()
-      : "";
-    if (!reply && cand?.finishReason === "SAFETY") {
-      return json({ reply: "I can't help with that one — I'm here for questions about using LogBook360." });
-    }
+    const reply = (data?.choices?.[0]?.message?.content ?? "").trim();
     return json({ reply: reply || "Sorry, I didn't catch that — could you rephrase?" });
   } catch (err) {
     console.error("assistant-chat error", err);

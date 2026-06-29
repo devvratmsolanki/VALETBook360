@@ -10,11 +10,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -22,20 +20,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * In-app help assistant — proxies a short, app-aware chat to the Google Gemini
- * API (free tier; key from https://aistudio.google.com). The API key lives ONLY
- * here (server env), never in the client. Raw HTTP keeps the service
- * dependency-light; the conversation is bounded and the system prompt is
- * role-scoped to THIS product.
+ * In-app help assistant — proxies a short, app-aware chat to Groq's OpenAI-
+ * compatible chat-completions API (free, no card; key from https://console.groq.com).
+ * The API key lives ONLY here (server env), never in the client. Raw HTTP keeps
+ * the service dependency-light; the conversation is bounded and the system prompt
+ * is role-scoped to THIS product.
  *
- * Configure via env: GEMINI_API_KEY (required to enable), ASSISTANT_MODEL
- * (optional, default gemini-2.0-flash).
+ * Configure via env: GROQ_API_KEY (required to enable), ASSISTANT_MODEL
+ * (optional, default llama-3.3-70b-versatile).
  */
 @Service
 public class AssistantService {
 
-    private static final String GEMINI_BASE =
-            "https://generativelanguage.googleapis.com/v1beta/models/";
+    private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     private static final int MAX_TURNS = 20;
     private static final int MAX_CHARS = 4000;
 
@@ -55,10 +52,10 @@ public class AssistantService {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
-    @Value("${GEMINI_API_KEY:}")
+    @Value("${GROQ_API_KEY:}")
     private String apiKey;
 
-    @Value("${ASSISTANT_MODEL:gemini-2.0-flash}")
+    @Value("${ASSISTANT_MODEL:llama-3.3-70b-versatile}")
     private String model;
 
     public AssistantService(ObjectMapper mapper) {
@@ -68,46 +65,43 @@ public class AssistantService {
     public String chat(AuthPrincipal caller, AssistantChatRequest req) {
         if (apiKey == null || apiKey.isBlank()) {
             throw ServiceException.badRequest("ASSISTANT_DISABLED",
-                    "The help assistant isn't configured yet. Set GEMINI_API_KEY.");
+                    "The help assistant isn't configured yet. Set GROQ_API_KEY.");
         }
 
-        // Validate + clamp the conversation. Gemini roles are user|model.
+        // Build OpenAI-style messages: a leading system prompt, then the clamped
+        // user/assistant turns.
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", systemPrompt(caller)));
         List<AssistantChatRequest.Message> raw = req.messages();
-        List<Map<String, Object>> contents = new ArrayList<>();
         int from = Math.max(0, raw.size() - MAX_TURNS);
         String lastRole = null;
         for (int i = from; i < raw.size(); i++) {
             AssistantChatRequest.Message m = raw.get(i);
             if (m == null || m.content() == null || m.content().isBlank()) continue;
-            String role = "assistant".equals(m.role()) ? "model" : "user";
+            String role = "assistant".equals(m.role()) ? "assistant" : "user";
             String text = m.content().length() > MAX_CHARS
                     ? m.content().substring(0, MAX_CHARS) : m.content();
-            Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("role", role);
-            entry.put("parts", List.of(Map.of("text", text)));
-            contents.add(entry);
+            messages.add(Map.of("role", role, "content", text));
             lastRole = role;
         }
-        if (contents.isEmpty() || !"user".equals(lastRole)) {
+        if (lastRole == null || !"user".equals(lastRole)) {
             throw ServiceException.badRequest("INVALID_MESSAGES",
                     "The last message must be from the user.");
         }
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("system_instruction",
-                Map.of("parts", List.of(Map.of("text", systemPrompt(caller)))));
-        body.put("contents", contents);
-        body.put("generationConfig", Map.of("maxOutputTokens", 1024, "temperature", 0.4));
+        body.put("model", model);
+        body.put("messages", messages);
+        body.put("max_tokens", 1024);
+        body.put("temperature", 0.4);
 
         final HttpResponse<String> resp;
         try {
-            String url = GEMINI_BASE + URLEncoder.encode(model, StandardCharsets.UTF_8)
-                    + ":generateContent";
             String payload = mapper.writeValueAsString(body);
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
+                    .uri(URI.create(GROQ_URL))
                     .timeout(Duration.ofSeconds(45))
-                    .header("x-goog-api-key", apiKey)
+                    .header("Authorization", "Bearer " + apiKey)
                     .header("content-type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
                     .build();
@@ -126,21 +120,7 @@ public class AssistantService {
 
         try {
             JsonNode root = mapper.readTree(resp.body());
-            // Prompt-level block (safety) → graceful message.
-            String block = root.path("promptFeedback").path("blockReason").asText("");
-            if (!block.isEmpty()) {
-                return "I can't help with that one — I'm here for questions about using LogBook360.";
-            }
-            JsonNode cand = root.path("candidates").path(0);
-            String finish = cand.path("finishReason").asText("");
-            StringBuilder sb = new StringBuilder();
-            for (JsonNode part : cand.path("content").path("parts")) {
-                sb.append(part.path("text").asText());
-            }
-            String reply = sb.toString().trim();
-            if (reply.isEmpty() && "SAFETY".equals(finish)) {
-                return "I can't help with that one — I'm here for questions about using LogBook360.";
-            }
+            String reply = root.path("choices").path(0).path("message").path("content").asText("").trim();
             return reply.isEmpty() ? "Sorry, I didn't catch that — could you rephrase?" : reply;
         } catch (Exception e) {
             throw new ServiceException(HttpStatus.BAD_GATEWAY,
