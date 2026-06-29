@@ -165,7 +165,9 @@ public class CompanyController {
     /** PUT /api/users/{id}/active — toggle a staff user's active flag. */
     @PutMapping("/users/{id}/active")
     public AdminUserResponse setUserActive(@PathVariable("id") UUID id,
-            @RequestBody com.valet.auth.dto.SetActiveRequest req) {
+            @Valid @RequestBody com.valet.auth.dto.SetActiveRequest req) {
+        // @Valid enforces SetActiveRequest's @NotNull on `active`; without it a
+        // body of {} would unbox a null Boolean -> NPE -> 500 in the service.
         return service.setUserActive(principal(), id, req.active());
     }
 

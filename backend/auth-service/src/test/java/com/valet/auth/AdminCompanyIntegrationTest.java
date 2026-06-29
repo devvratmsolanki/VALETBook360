@@ -354,6 +354,82 @@ class AdminCompanyIntegrationTest {
         assertThat(us.getBody()).anyMatch(u -> "Acme Valet".equals(((Map) u).get("companyName")));
     }
 
+    // ===================== edit-team-member (PUT /api/users/{id}) =========
+    //
+    // The recently-added staff-edit endpoint. These lock down the three ways it
+    // could leak: cross-tenant IDOR on {id}, privilege escalation via the role
+    // field, and cross-tenant location reassignment. Plus the happy path.
+
+    /** Resolve a seeded user's id by email (tests assert against the path id). */
+    private UUID userId(String email) {
+        return users.findAll().stream()
+                .filter(u -> email.equalsIgnoreCase(u.getEmail()))
+                .findFirst().orElseThrow().getId();
+    }
+
+    @Test
+    void managerCannotEditStaffInAnotherCompany() {
+        // A valet that belongs to company B.
+        UUID valetB = UUID.randomUUID();
+        users.save(new User(valetB, "valet.b@globex.test",
+                encoder.encode("valet1234"), Role.VALET, companyB, null, "Valet B", true));
+
+        String mgr = login("mgr.a@acme.test", "manager1234");
+        ResponseEntity<Map> resp = put(mgr, "/api/users/" + valetB, Map.of(
+                "name", "Hijacked", "role", "valet"));
+        // company is taken from the stored row, not the body, and authorized
+        // against the manager's own company -> cross-tenant IDOR blocked.
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(resp.getBody().get("code")).isEqualTo("CROSS_TENANT");
+    }
+
+    @Test
+    void updateStaffCannotEscalateRoleToManager() {
+        String mgr = login("mgr.a@acme.test", "manager1234");
+        ResponseEntity<Map> resp = put(mgr, "/api/users/" + userId("valet.a@acme.test"), Map.of(
+                "name", "Valet A", "role", "manager"));
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody().get("code")).isEqualTo("INVALID_STAFF_ROLE");
+    }
+
+    @Test
+    void updateStaffCannotTargetAManagerAccount() {
+        // Editing a manager/admin account through the staff endpoint is rejected
+        // before the role field is even considered (protected-account guard).
+        String mgr = login("mgr.a@acme.test", "manager1234");
+        ResponseEntity<Map> resp = put(mgr, "/api/users/" + userId("mgr.a@acme.test"), Map.of(
+                "name", "Self Demote", "role", "valet"));
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(resp.getBody().get("code")).isEqualTo("PROTECTED_ACCOUNT");
+    }
+
+    @Test
+    void updateStaffCannotReassignToForeignLocation() {
+        // A location owned by company B; manager A must not pin their own valet to it.
+        UUID locB = UUID.randomUUID();
+        locations.save(new Location(locB, companyB, "B-Loc", null, null, null, null, 5));
+
+        String mgr = login("mgr.a@acme.test", "manager1234");
+        ResponseEntity<Map> resp = put(mgr, "/api/users/" + userId("valet.a@acme.test"), Map.of(
+                "name", "Valet A", "role", "valet", "locationId", locB.toString()));
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(resp.getBody().get("code")).isEqualTo("CROSS_TENANT");
+    }
+
+    @Test
+    void managerCanEditOwnStaffNameRoleAndLocation() {
+        UUID locA = UUID.randomUUID();
+        locations.save(new Location(locA, companyA, "A-Loc", null, null, null, null, 5));
+
+        String mgr = login("mgr.a@acme.test", "manager1234");
+        ResponseEntity<Map> resp = put(mgr, "/api/users/" + userId("valet.a@acme.test"), Map.of(
+                "name", "Renamed Valet", "role", "driver", "locationId", locA.toString()));
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody().get("name")).isEqualTo("Renamed Valet");
+        assertThat(resp.getBody().get("role")).isEqualTo("driver");
+        assertThat(resp.getBody().get("locationId")).isEqualTo(locA.toString());
+    }
+
     @Test
     void updateLocationEnforcesTenant() {
         String admin = login("admin@valet.test", "admin1234");

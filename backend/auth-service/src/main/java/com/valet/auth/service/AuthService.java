@@ -69,11 +69,16 @@ public class AuthService {
         }
 
         // 2) Managers are tenant-bound: they can only create users for their own
-        //    company, and may not mint admins.
+        //    company, and may ONLY create operator (valet) / driver staff — never
+        //    another manager or an admin. Without this, a manager could mint a
+        //    co-owner (role=manager) for their own company via /auth/register and
+        //    escalate privileges. This mirrors the createStaff path's restriction
+        //    (see CompanyAdminService.createStaff / updateStaff) so the two
+        //    account-creation surfaces stay consistent.
         if (callerRole == Role.MANAGER) {
-            if (req.role() == Role.ADMIN) {
+            if (req.role() != Role.VALET && req.role() != Role.DRIVER) {
                 throw ServiceException.forbidden("INSUFFICIENT_PERMISSIONS",
-                        "Managers cannot create admin accounts.");
+                        "Managers can only create operator or driver accounts.");
             }
             if (caller.companyId() == null) {
                 throw ServiceException.forbidden("TENANT_MISSING",

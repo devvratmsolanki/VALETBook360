@@ -279,6 +279,14 @@ public class CompanyAdminService {
      */
     @Transactional(readOnly = true)
     public com.valet.auth.dto.OperatorKeySlotsResponse operatorKeySlots(AuthPrincipal caller) {
+        // Floor-staff only. The security chain leaves /key-slots at
+        // anyRequest().authenticated(), so without this a driver token (which can
+        // carry a locationId) could read its location's slot pool. Drivers have
+        // no use for it — exclude them explicitly (defence in depth).
+        if ("driver".equalsIgnoreCase(caller.role())) {
+            throw ServiceException.forbidden("NOT_AN_OPERATOR",
+                    "Key slots are only available to floor staff.");
+        }
         UUID locationId = caller.locationId();
         if (locationId == null) {
             throw ServiceException.badRequest("NO_LOCATION",

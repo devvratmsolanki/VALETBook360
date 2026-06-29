@@ -111,9 +111,13 @@ public class TransactionService {
                 throw ServiceException.forbidden("NOT_YOUR_TRANSACTION",
                         "You don't have access to this transaction.");
             }
-        } else {
-            // Operator-capable role (valet / manager / admin): must be same company.
-            if (!principal.companyId().equals(tx.getCompanyId())) {
+        } else if (!"admin".equalsIgnoreCase(principal.role())) {
+            // Operator-capable role (valet / manager): must be the same company.
+            // Compared null-safe so a manager/valet principal without a tenant
+            // matches no transaction (403) instead of NPE -> 500. A super-admin
+            // (tenant-less by design) is allowed cross-tenant reads, consistent
+            // with the admin cross-tenant views in the auth service.
+            if (!java.util.Objects.equals(principal.companyId(), tx.getCompanyId())) {
                 throw ServiceException.forbidden("NOT_YOUR_TRANSACTION",
                         "This transaction belongs to another company.");
             }
@@ -198,10 +202,19 @@ public class TransactionService {
             // return a precise SLOT_TAKEN the operator panel can recover from.
             saved = repository.saveAndFlush(tx);
         } catch (DataIntegrityViolationException e) {
-            // ux_active_keycode_per_location: another active car at this location
-            // already holds this key slot (a concurrent operator grabbed it).
-            throw ServiceException.conflict("SLOT_TAKEN",
-                    "That key slot was just taken. Pick another free slot and try again.");
+            // Only the key-slot uniqueness index maps to SLOT_TAKEN. Narrow the
+            // catch to that constraint by name so a FUTURE constraint (e.g. an
+            // FK on location_id) can't be silently mislabelled "slot taken" — it
+            // re-throws and surfaces as a generic 500/400 instead of misleading
+            // the operator into re-picking a slot.
+            String cause = e.getMostSpecificCause().getMessage();
+            if (cause != null && cause.contains("ux_active_keycode_per_location")) {
+                // Another active car at this location already holds this key slot
+                // (a concurrent operator grabbed it).
+                throw ServiceException.conflict("SLOT_TAKEN",
+                        "That key slot was just taken. Pick another free slot and try again.");
+            }
+            throw e;
         }
         realtime.emitCreated(saved);
         return saved;
@@ -321,7 +334,11 @@ public class TransactionService {
      *
      * @throws ServiceException 409 if {@code from -> to} is not a legal edge.
      */
-    public ValetTransaction transition(ValetTransaction tx, ValetStatus to) {
+    // Package-private on purpose: callers MUST first load the tx through a
+    // loadOwned* ownership/tenant guard. Keeping this out of the public API
+    // stops a future controller/scheduler from transitioning an arbitrary
+    // in-memory entity and bypassing tenant isolation.
+    ValetTransaction transition(ValetTransaction tx, ValetStatus to) {
         ValetTransaction saved = applyTransition(tx, to);
         realtime.emitStatus(saved);
         return saved;

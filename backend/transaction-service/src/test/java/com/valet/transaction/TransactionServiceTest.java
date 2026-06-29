@@ -9,6 +9,7 @@ import com.valet.transaction.repository.ValetTransactionRepository;
 import com.valet.transaction.service.TransactionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -44,8 +45,10 @@ class TransactionServiceTest {
         repository = mock(ValetTransactionRepository.class);
         realtime = mock(RealtimeEventPublisher.class);
         service = new TransactionService(repository, realtime);
-        // save() echoes its argument back, like JPA does.
+        // save()/saveAndFlush() echo their argument back, like JPA does.
         when(repository.save(any(ValetTransaction.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(repository.saveAndFlush(any(ValetTransaction.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -176,6 +179,37 @@ class TransactionServiceTest {
         assertThat(created.getLocationId()).isEqualTo(locationId);
         assertThat(created.getCarPlate()).isEqualTo("MH01AB1234");
         verify(realtime).emitCreated(any(ValetTransaction.class));
+    }
+
+    // --- operator: key-slot collision (ux_active_keycode_per_location) -----
+    //
+    // The partial unique index is the source of truth for "one active car per
+    // key slot per location". When two operators race for the same slot, the
+    // losing INSERT raises SQLSTATE 23505, surfaced by Spring as
+    // DataIntegrityViolationException on saveAndFlush. The service must translate
+    // that into a clean 409 SLOT_TAKEN the operator panel can recover from — not
+    // leak a 500 — and must NOT emit a phantom created event for the row that
+    // never committed.
+
+    @Test
+    void createForOperatorMapsSlotCollisionToConflictSlotTaken() {
+        CreateTransactionRequest req = new CreateTransactionRequest(
+                "MH01AB1234", null, null, null, null, null, "K-07");
+        when(repository.saveAndFlush(any(ValetTransaction.class)))
+                .thenThrow(new DataIntegrityViolationException(
+                        "duplicate key value violates unique constraint "
+                                + "\"ux_active_keycode_per_location\""));
+
+        assertThatThrownBy(() -> service.createForOperator(req, COMPANY, UUID.randomUUID()))
+                .isInstanceOf(ServiceException.class)
+                .satisfies(e -> {
+                    ServiceException se = (ServiceException) e;
+                    assertThat(se.getCode()).isEqualTo("SLOT_TAKEN");
+                    assertThat(se.getStatus().value()).isEqualTo(409);
+                });
+
+        // No realtime event for a row that never committed.
+        verify(realtime, never()).emitCreated(any());
     }
 
     // --- operator: full happy path -----------------------------------------

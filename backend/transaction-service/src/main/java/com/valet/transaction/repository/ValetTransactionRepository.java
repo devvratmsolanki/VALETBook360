@@ -21,8 +21,9 @@ public interface ValetTransactionRepository extends JpaRepository<ValetTransacti
     /**
      * A driver's active PARK (intake) missions, newest first: cars assigned to
      * this driver to park that are still awaiting parking. Backed by the
-     * {@code parked_by_driver_id} partial index. Status filter is the intake set
-     * (currently just {@code waiting_for_driver}).
+     * {@code ix_tx_parker_status (parked_by_driver_id, status)} partial index
+     * (added in V4). Status filter is the intake set (currently just
+     * {@code waiting_for_driver}).
      */
     List<ValetTransaction> findByParkedByDriverIdAndStatusInOrderByCreatedAtDesc(
             UUID parkedByDriverId, Collection<ValetStatus> statuses);
