@@ -51,7 +51,7 @@ class MissionCard extends ConsumerWidget {
             children: [
               _ribbon(),
               const Spacer(),
-              const Icon(Icons.schedule_rounded,
+              Icon(Icons.schedule_rounded,
                   size: 15, color: VColors.contentFaint),
               const SizedBox(width: VSpace.x1),
               Text(elapsed, style: VType.mono),
@@ -170,7 +170,7 @@ class MissionCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(VRadius.full),
         border: Border.all(color: VColors.surface600, width: 1),
       ),
-      child: const Text(
+      child: Text(
         'No action for this mission',
         style: VType.caption,
       ),

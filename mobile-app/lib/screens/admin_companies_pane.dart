@@ -59,7 +59,7 @@ class AdminCompaniesPane extends ConsumerWidget {
   ) {
     switch (state.status) {
       case CompaniesStatus.loading:
-        return const Center(
+        return Center(
           child: CircularProgressIndicator(color: VColors.brand400),
         );
       case CompaniesStatus.error:
@@ -143,7 +143,7 @@ class _CompanyCard extends StatelessWidget {
                   color: VColors.brand900,
                   borderRadius: BorderRadius.circular(VRadius.md),
                 ),
-                child: const Icon(Icons.business_rounded,
+                child: Icon(Icons.business_rounded,
                     color: VColors.brand300),
               ),
               const SizedBox(width: VSpace.x3),
@@ -164,7 +164,7 @@ class _CompanyCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded,
+              Icon(Icons.chevron_right_rounded,
                   color: VColors.contentMuted),
             ],
           ),

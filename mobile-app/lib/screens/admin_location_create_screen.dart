@@ -135,7 +135,7 @@ class _AdminLocationSheetState extends ConsumerState<AdminLocationSheet> {
             Text(_isEdit ? 'Edit location' : 'New location',
                 style: VType.title.copyWith(color: VColors.contentStrong)),
             const SizedBox(height: VSpace.x1),
-            const Text('Set the place and its key-slot capacity.',
+            Text('Set the place and its key-slot capacity.',
                 style: VType.caption),
             const SizedBox(height: VSpace.x5),
             if (_error != null) ...[

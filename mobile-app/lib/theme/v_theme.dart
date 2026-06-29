@@ -11,7 +11,7 @@ const String _mono = 'JetBrains Mono';
 const List<String> _monoFallback = ['JetBrains Mono', 'monospace'];
 
 TextTheme _buildTextTheme() {
-  return const TextTheme(
+  return TextTheme(
     // display — plate hero on driver mission card (34/40/700)
     displayLarge: TextStyle(
       fontFamily: _sans,
@@ -73,129 +73,144 @@ TextTheme _buildTextTheme() {
 
 /// Named access to the mono styles and the semantic scale steps that don't map
 /// 1:1 onto Material's TextTheme slots.
+///
+/// These are **getters** (not `const`) so their `color`, sourced from the
+/// runtime [VColors] getters, re-reads on a theme toggle. Font/size/weight are
+/// stable; only the resolved color differs between light and dark.
 class VType {
   const VType._();
 
-  static const display = TextStyle(
-    fontFamily: _sans,
-    fontSize: 34,
-    height: 40 / 34,
-    fontWeight: FontWeight.w700,
-    color: VColors.contentStrong,
-  );
+  static TextStyle get display => TextStyle(
+        fontFamily: _sans,
+        fontSize: 34,
+        height: 40 / 34,
+        fontWeight: FontWeight.w700,
+        color: VColors.contentStrong,
+      );
 
-  static const titleLg = TextStyle(
-    fontFamily: _sans,
-    fontSize: 24,
-    height: 30 / 24,
-    fontWeight: FontWeight.w700,
-    color: VColors.contentStrong,
-  );
+  static TextStyle get titleLg => TextStyle(
+        fontFamily: _sans,
+        fontSize: 24,
+        height: 30 / 24,
+        fontWeight: FontWeight.w700,
+        color: VColors.contentStrong,
+      );
 
-  static const title = TextStyle(
-    fontFamily: _sans,
-    fontSize: 20,
-    height: 26 / 20,
-    fontWeight: FontWeight.w600,
-    color: VColors.contentStrong,
-  );
+  static TextStyle get title => TextStyle(
+        fontFamily: _sans,
+        fontSize: 20,
+        height: 26 / 20,
+        fontWeight: FontWeight.w600,
+        color: VColors.contentStrong,
+      );
 
-  static const bodyLg = TextStyle(
-    fontFamily: _sans,
-    fontSize: 17,
-    height: 24 / 17,
-    fontWeight: FontWeight.w500,
-    color: VColors.contentDefault,
-  );
+  static TextStyle get bodyLg => TextStyle(
+        fontFamily: _sans,
+        fontSize: 17,
+        height: 24 / 17,
+        fontWeight: FontWeight.w500,
+        color: VColors.contentDefault,
+      );
 
-  static const body = TextStyle(
-    fontFamily: _sans,
-    fontSize: 15,
-    height: 22 / 15,
-    fontWeight: FontWeight.w400,
-    color: VColors.contentDefault,
-  );
+  static TextStyle get body => TextStyle(
+        fontFamily: _sans,
+        fontSize: 15,
+        height: 22 / 15,
+        fontWeight: FontWeight.w400,
+        color: VColors.contentDefault,
+      );
 
-  static const label = TextStyle(
-    fontFamily: _sans,
-    fontSize: 13,
-    height: 18 / 13,
-    fontWeight: FontWeight.w600,
-    color: VColors.contentDefault,
-  );
+  static TextStyle get label => TextStyle(
+        fontFamily: _sans,
+        fontSize: 13,
+        height: 18 / 13,
+        fontWeight: FontWeight.w600,
+        color: VColors.contentDefault,
+      );
 
-  static const caption = TextStyle(
-    fontFamily: _sans,
-    fontSize: 12,
-    height: 16 / 12,
-    fontWeight: FontWeight.w500,
-    color: VColors.contentMuted,
-  );
+  static TextStyle get caption => TextStyle(
+        fontFamily: _sans,
+        fontSize: 12,
+        height: 16 / 12,
+        fontWeight: FontWeight.w500,
+        color: VColors.contentMuted,
+      );
 
   // mono-lg — plate / slot hero (22/28/600 mono)
-  static const monoLg = TextStyle(
-    fontFamily: _mono,
-    fontFamilyFallback: _monoFallback,
-    fontSize: 22,
-    height: 28 / 22,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 1.5,
-    color: VColors.contentStrong,
-  );
+  static TextStyle get monoLg => TextStyle(
+        fontFamily: _mono,
+        fontFamilyFallback: _monoFallback,
+        fontSize: 22,
+        height: 28 / 22,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1.5,
+        color: VColors.contentStrong,
+      );
 
   // mono — timers, key codes, IDs (15/20/500 mono)
-  static const mono = TextStyle(
-    fontFamily: _mono,
-    fontFamilyFallback: _monoFallback,
-    fontSize: 15,
-    height: 20 / 15,
-    fontWeight: FontWeight.w500,
-    color: VColors.contentMuted,
-  );
+  static TextStyle get mono => TextStyle(
+        fontFamily: _mono,
+        fontFamilyFallback: _monoFallback,
+        fontSize: 15,
+        height: 20 / 15,
+        fontWeight: FontWeight.w500,
+        color: VColors.contentMuted,
+      );
 
   // Plate hero on the driver mission card — display size in mono.
-  static const plateHero = TextStyle(
-    fontFamily: _mono,
-    fontFamilyFallback: _monoFallback,
-    fontSize: 44,
-    height: 48 / 44,
-    fontWeight: FontWeight.w700,
-    letterSpacing: 4,
-    color: VColors.contentStrong,
-  );
+  static TextStyle get plateHero => TextStyle(
+        fontFamily: _mono,
+        fontFamilyFallback: _monoFallback,
+        fontSize: 44,
+        height: 48 / 44,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 4,
+        color: VColors.contentStrong,
+      );
 }
 
-/// Vālet dark-luxe theme (primary). Generated from tokens → ThemeData (M3).
-ThemeData buildValetDarkTheme() {
+/// Shared ThemeData builder for both brightnesses. The per-mode colors come
+/// from [VColors] getters (set via [VColors.setBrightness] before build) so the
+/// light and dark themes differ only in the [brightness]/[ColorScheme] flavour
+/// and the resolved token values — the structure is identical.
+ThemeData _buildValetTheme(Brightness brightness) {
   final textTheme = _buildTextTheme();
+  final isDark = brightness == Brightness.dark;
+  final colorScheme = (isDark
+      ? const ColorScheme.dark()
+      : const ColorScheme.light());
+
   return ThemeData(
     useMaterial3: true,
-    brightness: Brightness.dark,
+    brightness: brightness,
     scaffoldBackgroundColor: VColors.surface900,
     canvasColor: VColors.surface900,
     fontFamily: _sans,
     textTheme: textTheme,
-    splashColor: VColors.brand500.withValues(alpha: 0.10),
+    // Ripple/hover tints: brand-blue at low alpha (reads on paper and charcoal).
+    splashColor: VColors.brand500.withValues(alpha: 0.12),
     highlightColor: VColors.brand500.withValues(alpha: 0.06),
-    colorScheme: const ColorScheme.dark(
-      primary: VColors.brand500,
-      onPrimary: VColors.contentOnAccent,
-      primaryContainer: VColors.brand900,
-      onPrimaryContainer: VColors.brand300,
-      secondary: VColors.brand400,
+    colorScheme: colorScheme.copyWith(
+      primary: VColors.brand500, // blue #0073C0 — white button text passes AA
+      onPrimary: VColors.contentOnAccent, // WHITE on blue fill
+      primaryContainer: VColors.brand900, // blue tint bg
+      onPrimaryContainer:
+          isDark ? VColors.brand300 : VColors.brand700, // legible on the tint
+      secondary: VColors.accent, // terracotta
       onSecondary: VColors.contentOnAccent,
-      surface: VColors.surface800,
-      onSurface: VColors.contentDefault,
-      surfaceContainerHighest: VColors.surface700,
-      outline: VColors.surface500,
-      outlineVariant: VColors.surface600,
+      surface: VColors.surface800, // card surface
+      onSurface: VColors.contentDefault, // body ink
+      surfaceContainerHighest: VColors.surface700, // raised / input
+      outline: VColors.surface500, // strong borders
+      outlineVariant: VColors.surface600, // hairlines
       error: VColors.alertDanger,
-      onError: VColors.contentStrong,
+      onError: VColors.contentOnAccent, // white on the danger fill
     ),
     dividerColor: VColors.surface600,
-    iconTheme: const IconThemeData(color: VColors.contentDefault),
-    appBarTheme: const AppBarTheme(
+    iconTheme: IconThemeData(color: VColors.contentDefault),
+    appBarTheme: AppBarTheme(
       backgroundColor: VColors.surface900,
+      foregroundColor: VColors.contentStrong,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       centerTitle: false,
@@ -215,22 +230,28 @@ ThemeData buildValetDarkTheme() {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(VRadius.md),
-        borderSide: const BorderSide(color: VColors.surface600, width: 1),
+        borderSide: BorderSide(color: VColors.surface600, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(VRadius.md),
-        borderSide: const BorderSide(color: VColors.brand500, width: 1.6),
+        borderSide: BorderSide(color: VColors.brand500, width: 1.6),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(VRadius.md),
-        borderSide: const BorderSide(color: VColors.alertDanger, width: 1.4),
+        borderSide: BorderSide(color: VColors.alertDanger, width: 1.4),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(VRadius.md),
-        borderSide: const BorderSide(color: VColors.alertDanger, width: 1.6),
+        borderSide: BorderSide(color: VColors.alertDanger, width: 1.6),
       ),
       errorStyle: VType.caption.copyWith(color: VColors.alertDanger),
     ),
-    extensions: const [VStatusColors()],
+    extensions: [VStatusColors.current()],
   );
 }
+
+/// logbook360 warm-paper LIGHT theme (default).
+ThemeData buildValetLightTheme() => _buildValetTheme(Brightness.light);
+
+/// logbook360 warm-charcoal DARK theme.
+ThemeData buildValetDarkTheme() => _buildValetTheme(Brightness.dark);

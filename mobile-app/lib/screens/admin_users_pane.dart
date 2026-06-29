@@ -21,7 +21,7 @@ class AdminUsersPane extends ConsumerWidget {
 
     switch (state.status) {
       case AdminUsersStatus.loading:
-        return const Center(
+        return Center(
           child: CircularProgressIndicator(color: VColors.brand400),
         );
       case AdminUsersStatus.error:
@@ -167,7 +167,7 @@ class _CompanyCardState extends State<_CompanyCard> {
               padding: const EdgeInsets.all(VSpace.x4),
               child: Row(
                 children: [
-                  const Icon(Icons.business_rounded,
+                  Icon(Icons.business_rounded,
                       size: 20, color: VColors.brand300),
                   const SizedBox(width: VSpace.x3),
                   Expanded(
@@ -191,7 +191,7 @@ class _CompanyCardState extends State<_CompanyCard> {
             ),
           ),
           if (_expanded) ...[
-            const Divider(color: VColors.surface700, height: 1),
+            Divider(color: VColors.surface700, height: 1),
             Padding(
               padding: const EdgeInsets.fromLTRB(
                   VSpace.x4, VSpace.x3, VSpace.x4, VSpace.x4),

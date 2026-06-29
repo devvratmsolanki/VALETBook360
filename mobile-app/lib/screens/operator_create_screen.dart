@@ -87,9 +87,9 @@ class _OperatorCreateSheetState extends ConsumerState<OperatorCreateSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: VColors.surface900,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(VRadius.xl)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(VRadius.xl)),
           border: Border(
             top: BorderSide(color: VColors.surface700, width: 1),
           ),
@@ -124,7 +124,7 @@ class _OperatorCreateSheetState extends ConsumerState<OperatorCreateSheet> {
                       style: VType.title.copyWith(
                           color: VColors.contentStrong)),
                   const SizedBox(height: VSpace.x1),
-                  const Text('Check a vehicle onto the floor.',
+                  Text('Check a vehicle onto the floor.',
                       style: VType.caption),
                   const SizedBox(height: VSpace.x5),
                   if (err != null) ...[

@@ -6,6 +6,7 @@ import '../state/providers.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../widgets/app_logo.dart';
 import '../widgets/v_states.dart';
 import 'admin_location_create_screen.dart';
 import 'admin_staff_create_screen.dart';
@@ -32,28 +33,36 @@ class AdminCompanyDetailScreen extends ConsumerWidget {
         appBar: AppBar(
           backgroundColor: VColors.surface950,
           titleSpacing: 0,
-          title: Text(
-            state.company?.displayName ?? 'Company',
-            style: VType.title.copyWith(color: VColors.contentStrong),
-            overflow: TextOverflow.ellipsis,
+          title: Row(
+            children: [
+              const AppLogo(height: 22),
+              const SizedBox(width: VSpace.x3),
+              Flexible(
+                child: Text(
+                  state.company?.displayName ?? 'Company',
+                  style: VType.title.copyWith(color: VColors.contentStrong),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
           actions: [
             IconButton(
               tooltip: 'Refresh',
-              icon: const Icon(Icons.refresh_rounded,
+              icon: Icon(Icons.refresh_rounded,
                   color: VColors.contentMuted),
               onPressed: notifier.load,
             ),
             const SizedBox(width: VSpace.x2),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             isScrollable: true,
             indicatorColor: VColors.brand400,
             labelColor: VColors.contentStrong,
             unselectedLabelColor: VColors.contentMuted,
             labelStyle: VType.label,
             tabAlignment: TabAlignment.start,
-            tabs: [
+            tabs: const [
               Tab(text: 'Overview'),
               Tab(text: 'Locations'),
               Tab(text: 'Operators'),
@@ -77,7 +86,7 @@ class AdminCompanyDetailScreen extends ConsumerWidget {
   ) {
     switch (state.status) {
       case DetailStatus.loading:
-        return const Center(
+        return Center(
           child: CircularProgressIndicator(color: VColors.brand400),
         );
       case DetailStatus.error:
@@ -191,7 +200,7 @@ class _LocationsTab extends ConsumerWidget {
                   : '${loc.keyCapacity} key slots',
               trailing: IconButton(
                 tooltip: 'Edit',
-                icon: const Icon(Icons.edit_outlined,
+                icon: Icon(Icons.edit_outlined,
                     size: 20, color: VColors.contentMuted),
                 onPressed: () => edit(loc),
               ),
@@ -344,7 +353,7 @@ class _InfoCard extends StatelessWidget {
         children: [
           for (var i = 0; i < rows.length; i++) ...[
             if (i > 0)
-              const Divider(color: VColors.surface700, height: VSpace.x6),
+              Divider(color: VColors.surface700, height: VSpace.x6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -375,7 +384,7 @@ class _Tile extends StatelessWidget {
     required this.subtitle,
     this.trailing,
     this.badge,
-    this.badgeColor = VColors.brand300,
+    this.badgeColor, // defaults to brand300 at build (runtime token now)
   });
 
   final IconData leading;
@@ -383,10 +392,11 @@ class _Tile extends StatelessWidget {
   final String subtitle;
   final Widget? trailing;
   final String? badge;
-  final Color badgeColor;
+  final Color? badgeColor;
 
   @override
   Widget build(BuildContext context) {
+    final badgeColor = this.badgeColor ?? VColors.brand300;
     return Container(
       constraints: const BoxConstraints(minHeight: VTarget.minTouch),
       padding: const EdgeInsets.symmetric(

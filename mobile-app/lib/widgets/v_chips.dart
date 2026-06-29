@@ -30,7 +30,7 @@ class VKeySlotChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.vpn_key_rounded, size: 16, color: VColors.brand300),
+            Icon(Icons.vpn_key_rounded, size: 16, color: VColors.brand300),
             const SizedBox(width: VSpace.x2),
             Text(
               code,

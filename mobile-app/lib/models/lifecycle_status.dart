@@ -5,17 +5,17 @@ import '../theme/v_colors.dart';
 /// transactionService.js). The driver slice only acts on the dispatched →
 /// moving → ready → done tail, but the full ramp drives the status rail.
 enum LifecycleStatus {
-  waitingForDriver('waiting_for_driver', 'Queued', VColors.statusQueued),
-  parked('parked', 'Parked', VColors.statusSettled),
-  keyIn('key_in', 'Secured', VColors.statusSecured),
-  requested('requested', 'Requested', VColors.statusActive),
-  driverAssigned('driver_assigned', 'Assigned', VColors.statusDispatched),
-  enRoute('en_route', 'En route', VColors.statusMoving),
-  arrived('arrived', 'Arrived', VColors.statusReady),
-  delivered('delivered', 'Delivered', VColors.statusDone),
-  cancelled('cancelled', 'Cancelled', VColors.alertDanger);
+  waitingForDriver('waiting_for_driver', 'Queued'),
+  parked('parked', 'Parked'),
+  keyIn('key_in', 'Secured'),
+  requested('requested', 'Requested'),
+  driverAssigned('driver_assigned', 'Assigned'),
+  enRoute('en_route', 'En route'),
+  arrived('arrived', 'Arrived'),
+  delivered('delivered', 'Delivered'),
+  cancelled('cancelled', 'Cancelled');
 
-  const LifecycleStatus(this.wire, this.label, this.color);
+  const LifecycleStatus(this.wire, this.label);
 
   /// The exact string used on the wire / in Postgres.
   final String wire;
@@ -23,8 +23,20 @@ enum LifecycleStatus {
   /// Short human label for the rail and chips.
   final String label;
 
-  /// The single status hue for this state (doc §6.1.4).
-  final Color color;
+  /// The single status hue for this state (doc §6.1.4). A getter (not a stored
+  /// const) so it tracks the active light/dark palette via the [VColors]
+  /// runtime getters — re-reads on a theme toggle.
+  Color get color => switch (this) {
+        waitingForDriver => VColors.statusQueued,
+        parked => VColors.statusSettled,
+        keyIn => VColors.statusSecured,
+        requested => VColors.statusActive,
+        driverAssigned => VColors.statusDispatched,
+        enRoute => VColors.statusMoving,
+        arrived => VColors.statusReady,
+        delivered => VColors.statusDone,
+        cancelled => VColors.alertDanger,
+      };
 
   /// Ordered rail of the 8 lifecycle states (cancelled is off-rail).
   static const List<LifecycleStatus> rail = [

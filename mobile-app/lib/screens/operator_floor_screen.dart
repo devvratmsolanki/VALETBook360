@@ -12,6 +12,8 @@ import '../theme/motion.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../widgets/app_logo.dart';
+import '../widgets/theme_toggle_button.dart';
 import '../widgets/v_chips.dart';
 import '../widgets/v_primary_button.dart';
 import '../widgets/v_states.dart';
@@ -50,7 +52,12 @@ class OperatorFloorScreen extends ConsumerWidget {
       backgroundColor: VColors.surface950,
       appBar: AppBar(
         backgroundColor: VColors.surface950,
-        titleSpacing: VSpace.x4,
+        titleSpacing: 0,
+        leadingWidth: 116,
+        leading: const Padding(
+          padding: EdgeInsets.only(left: VSpace.x4),
+          child: Align(alignment: Alignment.centerLeft, child: AppLogo()),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -67,13 +74,14 @@ class OperatorFloorScreen extends ConsumerWidget {
           ],
         ),
         actions: [
+          const ThemeToggleButton(),
           IconButton(
             tooltip: 'Refresh',
             constraints: const BoxConstraints(
               minWidth: VTarget.minTouch,
               minHeight: VTarget.minTouch,
             ),
-            icon: const Icon(Icons.refresh_rounded, color: VColors.contentMuted),
+            icon: Icon(Icons.refresh_rounded, color: VColors.contentMuted),
             onPressed: () => ref.read(floorControllerProvider.notifier).load(),
           ),
           IconButton(
@@ -82,7 +90,7 @@ class OperatorFloorScreen extends ConsumerWidget {
               minWidth: VTarget.minTouch,
               minHeight: VTarget.minTouch,
             ),
-            icon: const Icon(Icons.logout_rounded, color: VColors.contentMuted),
+            icon: Icon(Icons.logout_rounded, color: VColors.contentMuted),
             onPressed: () => ref.read(authControllerProvider.notifier).logout(),
           ),
           const SizedBox(width: VSpace.x2),
@@ -398,7 +406,7 @@ class _ActionButton extends StatelessWidget {
         onPressed: busy ? null : onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: VColors.contentStrong,
-          side: const BorderSide(color: VColors.surface600, width: 1),
+          side: BorderSide(color: VColors.surface600, width: 1),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(VRadius.md),
           ),
@@ -428,10 +436,10 @@ class _CancelButton extends StatelessWidget {
           backgroundColor: VColors.surface800,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(VRadius.md),
-            side: const BorderSide(color: VColors.surface600, width: 1),
+            side: BorderSide(color: VColors.surface600, width: 1),
           ),
         ),
-        icon: const Icon(Icons.close_rounded,
+        icon: Icon(Icons.close_rounded,
             size: 20, color: VColors.contentMuted),
       ),
     );
@@ -617,7 +625,7 @@ class _AssignDriverSheetState extends ConsumerState<_AssignDriverSheet> {
                 IconButton(
                   tooltip: 'Close',
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded,
+                  icon: Icon(Icons.close_rounded,
                       color: VColors.contentMuted),
                 ),
               ],
@@ -653,8 +661,8 @@ class _AssignDriverSheetState extends ConsumerState<_AssignDriverSheet> {
     switch (drivers.status) {
       case DriversStatus.idle:
       case DriversStatus.loading:
-        return const Padding(
-          padding: EdgeInsets.symmetric(vertical: VSpace.x6),
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: VSpace.x6),
           child: Center(
             child: CircularProgressIndicator(color: VColors.brand400),
           ),
@@ -725,7 +733,7 @@ class _DriverTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Icon(Icons.person_pin_circle_rounded,
+              Icon(Icons.person_pin_circle_rounded,
                   size: 20, color: VColors.brand300),
               const SizedBox(width: VSpace.x3),
               Expanded(
@@ -746,7 +754,7 @@ class _DriverTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded,
+              Icon(Icons.chevron_right_rounded,
                   color: VColors.contentMuted),
             ],
           ),

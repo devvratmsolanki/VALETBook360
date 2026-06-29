@@ -1,11 +1,11 @@
 {
-    "name": "valet_driver_app",
-    "short_name": "valet_driver_app",
+    "name": "ValetBook360",
+    "short_name": "ValetBook360",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "ValetBook360 — valet management by LogBook360",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

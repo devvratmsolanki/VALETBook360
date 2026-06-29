@@ -161,8 +161,8 @@ class _AdminStaffSheetState extends ConsumerState<AdminStaffSheet> {
               ),
             ),
             if (widget.locations.isNotEmpty) ...[
-              const Padding(
-                padding: EdgeInsets.only(left: VSpace.x1, bottom: VSpace.x2),
+              Padding(
+                padding: const EdgeInsets.only(left: VSpace.x1, bottom: VSpace.x2),
                 child: Text('Location (optional)', style: VType.caption),
               ),
               _LocationDropdown(
@@ -216,7 +216,7 @@ class _LocationDropdown extends StatelessWidget {
           value: value,
           isExpanded: true,
           dropdownColor: VColors.surface800,
-          icon: const Icon(Icons.expand_more_rounded,
+          icon: Icon(Icons.expand_more_rounded,
               color: VColors.contentMuted),
           hint: Text('Unassigned',
               style: VType.bodyLg.copyWith(color: VColors.contentFaint)),

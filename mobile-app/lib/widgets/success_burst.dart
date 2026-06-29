@@ -67,7 +67,7 @@ class _SuccessBurstState extends State<SuccessBurst>
                 opacity: (1 - (_c.value - 0.3).clamp(0, 1) / 0.7).clamp(0, 1),
                 child: Transform.scale(
                   scale: 0.6 + Curves.easeOutBack.transform(_c.value) * 0.6,
-                  child: const Icon(
+                  child: Icon(
                     Icons.check_circle_rounded,
                     color: VColors.alertSuccess,
                     size: 96,

@@ -80,7 +80,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 decoration: const BoxDecoration(
                   gradient: RadialGradient(
                     radius: 0.6,
-                    colors: [Color(0x14A60445), Colors.transparent],
+                    colors: [Color(0x140073C0), Colors.transparent],
                   ),
                 ),
               ),
@@ -152,7 +152,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         ),
                         const SizedBox(height: VSpace.x6),
                         Text(
-                          'Vālet · Driver',
+                          'Powered by LogBook360',
                           textAlign: TextAlign.center,
                           style: VType.caption.copyWith(
                             color: VColors.contentFaint,
@@ -181,18 +181,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         child: Column(
           children: [
-            Text(
-              'VĀLET',
-              textAlign: TextAlign.center,
-              style: VType.titleLg.copyWith(letterSpacing: 12, fontSize: 28),
+            Image.asset(
+              'assets/images/logbook360_logo.png',
+              height: 54,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
             ),
-            const SizedBox(height: VSpace.x2),
+            const SizedBox(height: VSpace.x3),
             Text(
-              'D R I V E R',
+              'VALET MANAGEMENT',
               textAlign: TextAlign.center,
               style: VType.caption.copyWith(
                 color: VColors.contentMuted,
-                letterSpacing: 6,
+                letterSpacing: 4,
               ),
             ),
           ],

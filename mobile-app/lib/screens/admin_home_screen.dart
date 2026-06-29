@@ -4,6 +4,8 @@ import '../state/providers.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../widgets/app_logo.dart';
+import '../widgets/theme_toggle_button.dart';
 import 'admin_company_detail_screen.dart';
 import 'admin_companies_pane.dart';
 import 'admin_locations_pane.dart';
@@ -55,7 +57,7 @@ class _ManagerHome extends ConsumerWidget {
       return Scaffold(
         backgroundColor: VColors.surface950,
         appBar: _SignOutAppBar(title: 'My Company', ref: ref),
-        body: const Center(
+        body: Center(
           child: CircularProgressIndicator(color: VColors.brand400),
         ),
       );
@@ -100,7 +102,12 @@ class _AdminShellState extends ConsumerState<_AdminShell> {
       backgroundColor: VColors.surface950,
       appBar: AppBar(
         backgroundColor: VColors.surface950,
-        titleSpacing: VSpace.x4,
+        titleSpacing: 0,
+        leadingWidth: 116,
+        leading: const Padding(
+          padding: EdgeInsets.only(left: VSpace.x4),
+          child: Align(alignment: Alignment.centerLeft, child: AppLogo()),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -112,6 +119,7 @@ class _AdminShellState extends ConsumerState<_AdminShell> {
           ],
         ),
         actions: [
+          const ThemeToggleButton(),
           _LogoutButton(ref: ref),
           const SizedBox(width: VSpace.x2),
         ],
@@ -160,7 +168,7 @@ class _LogoutButton extends StatelessWidget {
         minWidth: VTarget.minTouch,
         minHeight: VTarget.minTouch,
       ),
-      icon: const Icon(Icons.logout_rounded, color: VColors.contentMuted),
+      icon: Icon(Icons.logout_rounded, color: VColors.contentMuted),
       onPressed: () => ref.read(authControllerProvider.notifier).logout(),
     );
   }
@@ -178,8 +186,18 @@ class _SignOutAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return AppBar(
       backgroundColor: VColors.surface950,
+      titleSpacing: 0,
+      leadingWidth: 116,
+      leading: const Padding(
+        padding: EdgeInsets.only(left: VSpace.x4),
+        child: Align(alignment: Alignment.centerLeft, child: AppLogo()),
+      ),
       title: Text(title, style: VType.title.copyWith(color: VColors.contentStrong)),
-      actions: [_LogoutButton(ref: ref), const SizedBox(width: VSpace.x2)],
+      actions: [
+        const ThemeToggleButton(),
+        _LogoutButton(ref: ref),
+        const SizedBox(width: VSpace.x2),
+      ],
     );
   }
 }

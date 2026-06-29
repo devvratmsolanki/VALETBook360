@@ -97,7 +97,7 @@ class _AdminCompanyCreateSheetState
             Text('New company',
                 style: VType.title.copyWith(color: VColors.contentStrong)),
             const SizedBox(height: VSpace.x1),
-            const Text('Creates the company and its owner login in one step.',
+            Text('Creates the company and its owner login in one step.',
                 style: VType.caption),
             const SizedBox(height: VSpace.x5),
             if (_error != null) ...[

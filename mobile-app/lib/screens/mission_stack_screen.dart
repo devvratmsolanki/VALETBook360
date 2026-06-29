@@ -9,8 +9,10 @@ import '../theme/motion.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../widgets/app_logo.dart';
 import '../widgets/mission_card.dart';
 import '../widgets/success_burst.dart';
+import '../widgets/theme_toggle_button.dart';
 import '../widgets/v_states.dart';
 
 /// 7.5 Driver — Mission Stack (home). Active mission full-bleed with the
@@ -87,7 +89,12 @@ class _MissionStackScreenState extends ConsumerState<MissionStackScreen> {
       backgroundColor: VColors.surface950,
       appBar: AppBar(
         backgroundColor: VColors.surface950,
-        titleSpacing: VSpace.x4,
+        titleSpacing: 0,
+        leadingWidth: 116,
+        leading: const Padding(
+          padding: EdgeInsets.only(left: VSpace.x4),
+          child: Align(alignment: Alignment.centerLeft, child: AppLogo()),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -101,13 +108,14 @@ class _MissionStackScreenState extends ConsumerState<MissionStackScreen> {
           ],
         ),
         actions: [
+          const ThemeToggleButton(),
           IconButton(
             tooltip: 'Refresh',
             constraints: const BoxConstraints(
               minWidth: VTarget.minTouch,
               minHeight: VTarget.minTouch,
             ),
-            icon: const Icon(Icons.refresh_rounded, color: VColors.contentMuted),
+            icon: Icon(Icons.refresh_rounded, color: VColors.contentMuted),
             onPressed: () =>
                 ref.read(missionsControllerProvider.notifier).load(),
           ),
@@ -117,7 +125,7 @@ class _MissionStackScreenState extends ConsumerState<MissionStackScreen> {
               minWidth: VTarget.minTouch,
               minHeight: VTarget.minTouch,
             ),
-            icon: const Icon(Icons.logout_rounded, color: VColors.contentMuted),
+            icon: Icon(Icons.logout_rounded, color: VColors.contentMuted),
             onPressed: () => ref.read(authControllerProvider.notifier).logout(),
           ),
           const SizedBox(width: VSpace.x2),

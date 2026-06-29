@@ -63,7 +63,7 @@ class _VPrimaryButtonState extends State<VPrimaryButton> {
                   : null,
             ),
             child: widget.loading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(

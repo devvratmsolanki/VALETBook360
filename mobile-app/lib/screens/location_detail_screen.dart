@@ -13,6 +13,7 @@ import '../state/providers.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../widgets/app_logo.dart';
 import '../widgets/v_primary_button.dart';
 import '../widgets/v_states.dart';
 
@@ -65,28 +66,40 @@ class LocationDetailScreen extends ConsumerWidget {
         appBar: AppBar(
           backgroundColor: VColors.surface950,
           elevation: 0,
-          iconTheme: const IconThemeData(color: VColors.contentMuted),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
+          iconTheme: IconThemeData(color: VColors.contentMuted),
+          titleSpacing: 0,
+          title: Row(
             children: [
-              Text(location.name,
-                  style: VType.title.copyWith(color: VColors.contentStrong)),
-              Text(
-                  [location.address, location.city, location.state]
-                      .where((p) => p != null && p.isNotEmpty)
-                      .join(', '),
-                  style: VType.caption),
+              const AppLogo(height: 22),
+              const SizedBox(width: VSpace.x3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(location.name,
+                        style:
+                            VType.title.copyWith(color: VColors.contentStrong),
+                        overflow: TextOverflow.ellipsis),
+                    Text(
+                        [location.address, location.city, location.state]
+                            .where((p) => p != null && p.isNotEmpty)
+                            .join(', '),
+                        style: VType.caption,
+                        overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
             ],
           ),
-          bottom: const TabBar(
+          bottom: TabBar(
             isScrollable: true,
             indicatorColor: VColors.brand400,
             labelColor: VColors.contentStrong,
             unselectedLabelColor: VColors.contentMuted,
             labelStyle: VType.label,
             tabAlignment: TabAlignment.start,
-            tabs: [
+            tabs: const [
               Tab(text: 'Overview'),
               Tab(text: 'Key Slots'),
               Tab(text: 'Drivers'),
@@ -243,7 +256,7 @@ class _KeySlotsTab extends ConsumerWidget {
     }
 
     return slotsAsync.when(
-      loading: () => const Center(
+      loading: () => Center(
           child: CircularProgressIndicator(color: VColors.brand400)),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(VSpace.x4),
@@ -266,7 +279,7 @@ class _KeySlotsTab extends ConsumerWidget {
                 ),
                 child: Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -341,7 +354,7 @@ class _StandardNumbering extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.vpn_key_outlined,
+            Icon(Icons.vpn_key_outlined,
                 size: 44, color: VColors.surface600),
             const SizedBox(height: VSpace.x4),
             Text('Standard Numbering Active',
@@ -411,7 +424,7 @@ class _SlotCardState extends State<_SlotCard> {
                     IconButton(
                       iconSize: 16,
                       onPressed: () => setState(() => _editing = false),
-                      icon: const Icon(Icons.close_rounded,
+                      icon: Icon(Icons.close_rounded,
                           color: VColors.contentMuted),
                     ),
                     IconButton(
@@ -422,7 +435,7 @@ class _SlotCardState extends State<_SlotCard> {
                         setState(() => _editing = false);
                         await widget.onRename(name);
                       },
-                      icon: const Icon(Icons.check_rounded,
+                      icon: Icon(Icons.check_rounded,
                           color: VColors.alertSuccess),
                     ),
                   ],
@@ -484,7 +497,7 @@ class _DriversTab extends ConsumerWidget {
         .where((d) => d.locationId == null || d.locationId == location.id)
         .toList();
     if (detail.status == DetailStatus.loading) {
-      return const Center(
+      return Center(
           child: CircularProgressIndicator(color: VColors.brand400));
     }
     if (drivers.isEmpty) {
@@ -518,7 +531,7 @@ class _DriverRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.directions_car_filled_rounded,
+          Icon(Icons.directions_car_filled_rounded,
               color: VColors.brand400, size: 18),
           const SizedBox(width: VSpace.x3),
           Expanded(
@@ -695,13 +708,13 @@ class _BulkSlotSheetState extends ConsumerState<_BulkSlotSheet> {
               ),
               IconButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                icon: const Icon(Icons.close_rounded,
+                icon: Icon(Icons.close_rounded,
                     color: VColors.contentMuted),
               ),
             ],
           ),
           const SizedBox(height: VSpace.x1),
-          const Text(
+          Text(
               'System will generate unique labels for your key storage. This will NOT affect active transactions.',
               style: VType.caption),
           const SizedBox(height: VSpace.x4),
@@ -830,15 +843,15 @@ class _Field extends StatelessWidget {
                 horizontal: VSpace.x3, vertical: VSpace.x3),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(VRadius.md),
-              borderSide: const BorderSide(color: VColors.surface700),
+              borderSide: BorderSide(color: VColors.surface700),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(VRadius.md),
-              borderSide: const BorderSide(color: VColors.surface700),
+              borderSide: BorderSide(color: VColors.surface700),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(VRadius.md),
-              borderSide: const BorderSide(color: VColors.brand500),
+              borderSide: BorderSide(color: VColors.brand500),
             ),
           ),
         ),

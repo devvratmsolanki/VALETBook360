@@ -69,9 +69,9 @@ class AdminSheetShell extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: VColors.surface900,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(VRadius.xl)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(VRadius.xl)),
           border: Border(top: BorderSide(color: VColors.surface700, width: 1)),
         ),
         child: SafeArea(

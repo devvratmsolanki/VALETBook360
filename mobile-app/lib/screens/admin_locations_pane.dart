@@ -22,7 +22,7 @@ class AdminLocationsPane extends ConsumerWidget {
 
     switch (state.status) {
       case AdminLocationsStatus.loading:
-        return const Center(
+        return Center(
           child: CircularProgressIndicator(color: VColors.brand400),
         );
       case AdminLocationsStatus.error:
@@ -141,7 +141,7 @@ class _CompanyGroupHeader extends StatelessWidget {
           IconButton(
             tooltip: 'Add location',
             visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.add_circle_outline_rounded,
+            icon: Icon(Icons.add_circle_outline_rounded,
                 size: 20, color: VColors.brand300),
             onPressed: onAdd,
           ),
@@ -168,7 +168,7 @@ class _LocationRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.place_rounded, size: 20, color: VColors.brand300),
+          Icon(Icons.place_rounded, size: 20, color: VColors.brand300),
           const SizedBox(width: VSpace.x3),
           Expanded(
             child: Column(
@@ -202,7 +202,7 @@ class _LocationRow extends StatelessWidget {
           ),
           IconButton(
             tooltip: 'Edit',
-            icon: const Icon(Icons.edit_outlined,
+            icon: Icon(Icons.edit_outlined,
                 size: 20, color: VColors.contentMuted),
             onPressed: onEdit,
           ),

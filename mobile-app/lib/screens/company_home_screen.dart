@@ -11,6 +11,8 @@ import '../state/providers.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../widgets/app_logo.dart';
+import '../widgets/theme_toggle_button.dart';
 import '../widgets/v_primary_button.dart';
 import '../widgets/v_states.dart';
 import 'admin_location_create_screen.dart';
@@ -38,7 +40,7 @@ class CompanyHomeScreen extends ConsumerWidget {
             : null);
 
     if (id == null) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: VColors.surface950,
         body: Center(
           child: CircularProgressIndicator(color: VColors.brand400),
@@ -75,20 +77,26 @@ class _CompanyShell extends ConsumerWidget {
         appBar: AppBar(
           backgroundColor: VColors.surface950,
           elevation: 0,
-          titleSpacing: VSpace.x4,
+          titleSpacing: 0,
+          leadingWidth: 116,
+          leading: const Padding(
+            padding: EdgeInsets.only(left: VSpace.x4),
+            child: Align(alignment: Alignment.centerLeft, child: AppLogo()),
+          ),
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(companyName,
                   style: VType.title.copyWith(color: VColors.contentStrong)),
-              const Text('Company panel', style: VType.caption),
+              Text('Company panel', style: VType.caption),
             ],
           ),
           actions: [
+            const ThemeToggleButton(),
             IconButton(
               tooltip: 'Refresh',
-              icon: const Icon(Icons.refresh_rounded,
+              icon: Icon(Icons.refresh_rounded,
                   color: VColors.contentMuted),
               onPressed: () {
                 ref.invalidate(companyHistoryProvider);
@@ -99,13 +107,13 @@ class _CompanyShell extends ConsumerWidget {
             ),
             IconButton(
               tooltip: 'Sign out',
-              icon: const Icon(Icons.logout_rounded,
+              icon: Icon(Icons.logout_rounded,
                   color: VColors.contentMuted),
               onPressed: () =>
                   ref.read(authControllerProvider.notifier).logout(),
             ),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             isScrollable: true,
             indicatorColor: VColors.brand400,
             labelColor: VColors.contentStrong,
@@ -157,7 +165,7 @@ bool _isToday(DateTime? dt) {
   return l.year == now.year && l.month == now.month && l.day == now.day;
 }
 
-Widget _loading() => const Center(
+Widget _loading() => Center(
     child: CircularProgressIndicator(color: VColors.brand400));
 
 Widget _error(String message, VoidCallback onRetry) => Padding(
@@ -541,11 +549,11 @@ Future<bool?> _confirm(BuildContext context, String title, String body) {
       actions: [
         TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel',
+            child: Text('Cancel',
                 style: TextStyle(color: VColors.contentMuted))),
         TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete',
+            child: Text('Delete',
                 style: TextStyle(color: VColors.alertDanger))),
       ],
     ),
@@ -606,7 +614,7 @@ class _PersonRow extends StatelessWidget {
           ),
           PopupMenuButton<String>(
             color: VColors.surface800,
-            icon: const Icon(Icons.more_vert_rounded,
+            icon: Icon(Icons.more_vert_rounded,
                 color: VColors.contentMuted, size: 20),
             onSelected: (v) => v == 'toggle' ? onToggle() : onDelete(),
             itemBuilder: (_) => [
@@ -615,7 +623,7 @@ class _PersonRow extends StatelessWidget {
                 child: Text(user.active ? 'Deactivate' : 'Activate',
                     style: VType.body.copyWith(color: VColors.contentStrong)),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'delete',
                 child: Text('Delete',
                     style: TextStyle(color: VColors.alertDanger)),
@@ -720,7 +728,7 @@ class _LocationRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.location_on_rounded,
+            Icon(Icons.location_on_rounded,
                 color: VColors.brand400, size: 20),
             const SizedBox(width: VSpace.x3),
             Expanded(
@@ -741,7 +749,7 @@ class _LocationRow extends StatelessWidget {
             IconButton(
               tooltip: 'Edit location',
               onPressed: onEdit,
-              icon: const Icon(Icons.edit_outlined,
+              icon: Icon(Icons.edit_outlined,
                   color: VColors.contentMuted, size: 18),
             ),
           ],
@@ -1030,7 +1038,7 @@ class _ContractCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.description_rounded,
+              Icon(Icons.description_rounded,
                   color: VColors.brand400, size: 18),
               const SizedBox(width: VSpace.x2),
               Expanded(
@@ -1063,7 +1071,7 @@ class _ContractCard extends StatelessWidget {
           if (c.managerName != null ||
               c.managerPhone != null ||
               c.managerEmail != null) ...[
-            const Divider(color: VColors.surface700, height: VSpace.x4),
+            Divider(color: VColors.surface700, height: VSpace.x4),
             if (c.managerName != null)
               _line(Icons.person_outline_rounded, c.managerName!),
             if (c.managerPhone != null)
@@ -1177,7 +1185,7 @@ class _AddContractSheetState extends ConsumerState<_AddContractSheet> {
               ),
               IconButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                icon: const Icon(Icons.close_rounded,
+                icon: Icon(Icons.close_rounded,
                     color: VColors.contentMuted),
               ),
             ],
@@ -1214,11 +1222,11 @@ class _AddContractSheetState extends ConsumerState<_AddContractSheet> {
           isDense: true,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(VRadius.md),
-            borderSide: const BorderSide(color: VColors.surface700),
+            borderSide: BorderSide(color: VColors.surface700),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(VRadius.md),
-            borderSide: const BorderSide(color: VColors.surface700),
+            borderSide: BorderSide(color: VColors.surface700),
           ),
         ),
       );
@@ -1245,7 +1253,8 @@ class _AddScaffold extends StatelessWidget {
         foregroundColor: VColors.contentOnAccent,
         onPressed: onAdd,
         icon: const Icon(Icons.add_rounded),
-        label: Text(label, style: VType.label),
+        label: Text(label,
+            style: VType.label.copyWith(color: VColors.contentOnAccent)),
       ),
     );
   }

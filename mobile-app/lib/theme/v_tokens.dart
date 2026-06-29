@@ -58,18 +58,37 @@ class VMotion {
 @immutable
 class VStatusColors extends ThemeExtension<VStatusColors> {
   const VStatusColors({
-    this.queued = VColors.statusQueued,
-    this.settled = VColors.statusSettled,
-    this.secured = VColors.statusSecured,
-    this.active = VColors.statusActive,
-    this.dispatched = VColors.statusDispatched,
-    this.moving = VColors.statusMoving,
-    this.ready = VColors.statusReady,
-    this.done = VColors.statusDone,
-    this.warn = VColors.alertWarn,
-    this.danger = VColors.alertDanger,
-    this.success = VColors.alertSuccess,
+    required this.queued,
+    required this.settled,
+    required this.secured,
+    required this.active,
+    required this.dispatched,
+    required this.moving,
+    required this.ready,
+    required this.done,
+    required this.warn,
+    required this.danger,
+    required this.success,
   });
+
+  /// Snapshot the status ramp from the live [VColors] getters for the CURRENT
+  /// brightness. The theme builders call this (per build), so a theme toggle —
+  /// which flips [VColors.setBrightness] before the rebuild — produces the
+  /// correctly-tuned status colors for the active mode. (Can't be `const`
+  /// anymore because the source tokens are now runtime getters.)
+  factory VStatusColors.current() => VStatusColors(
+        queued: VColors.statusQueued,
+        settled: VColors.statusSettled,
+        secured: VColors.statusSecured,
+        active: VColors.statusActive,
+        dispatched: VColors.statusDispatched,
+        moving: VColors.statusMoving,
+        ready: VColors.statusReady,
+        done: VColors.statusDone,
+        warn: VColors.alertWarn,
+        danger: VColors.alertDanger,
+        success: VColors.alertSuccess,
+      );
 
   final Color queued;
   final Color settled;

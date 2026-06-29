@@ -66,18 +66,19 @@ class VBanner extends StatelessWidget {
   const VBanner({
     super.key,
     required this.message,
-    this.color = VColors.alertDanger,
+    this.color, // defaults to alertDanger at build (a runtime token now)
     this.icon = Icons.error_outline_rounded,
     this.onRetry,
   });
 
   final String message;
-  final Color color;
+  final Color? color;
   final IconData icon;
   final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
+    final color = this.color ?? VColors.alertDanger;
     return Semantics(
       liveRegion: true,
       container: true,
@@ -165,7 +166,7 @@ class _VShimmerState extends State<VShimmer>
             return LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: const [
+              colors: [
                 VColors.surface700,
                 VColors.surface600,
                 VColors.surface700,

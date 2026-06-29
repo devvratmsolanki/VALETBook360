@@ -10,12 +10,25 @@ import 'admin_users_controller.dart';
 import 'auth_controller.dart';
 import 'companies_controller.dart';
 import 'company_detail_controller.dart';
+import 'package:flutter/material.dart';
 import 'drivers_controller.dart';
 import 'floor_controller.dart';
 import 'missions_controller.dart';
+import 'theme_controller.dart';
 
 /// Secure token store singleton.
 final tokenStoreProvider = Provider<TokenStore>((ref) => TokenStore());
+
+/// Persisted theme preference store.
+final themeStoreProvider = Provider<ThemeStore>((ref) => ThemeStore());
+
+/// App theme mode (light / dark / system), restored from secure storage on
+/// boot. The root ConsumerWidget watches this to drive MaterialApp.themeMode
+/// AND to flip VColors.setBrightness before each build.
+final themeControllerProvider =
+    StateNotifierProvider<ThemeController, ThemeMode>((ref) {
+  return ThemeController(ref.watch(themeStoreProvider));
+});
 
 /// Typed API client. The 401 → bounce-to-login wiring is attached by the auth
 /// controller after it constructs (avoids a provider dependency cycle).

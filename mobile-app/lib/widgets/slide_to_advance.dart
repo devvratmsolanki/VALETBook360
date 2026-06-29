@@ -183,8 +183,8 @@ class _SlideToAdvanceState extends State<SlideToAdvance>
                             : null,
                       ),
                       child: widget.busy
-                          ? const Padding(
-                              padding: EdgeInsets.all(16),
+                          ? Padding(
+                              padding: const EdgeInsets.all(16),
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.4,
                                 valueColor: AlwaysStoppedAnimation(
