@@ -144,7 +144,7 @@ const Staff = () => {
                                     <input type="password" required value={addForm.password} onChange={e => setAddForm({ ...addForm, password: e.target.value })} className="w-full bg-dark-600 border-white/5 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-brand-500/50" placeholder="••••••••" />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-400 mb-1">Role</label>
                                     <select value={addForm.role} onChange={e => setAddForm({ ...addForm, role: e.target.value })} className="w-full bg-dark-600 border-white/5 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-brand-500/50">

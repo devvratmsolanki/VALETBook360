@@ -127,7 +127,33 @@ const AdminTransactions = () => {
             </div>
 
             <Card className="overflow-hidden">
-                <div className="overflow-x-auto">
+                {/* Mobile cards */}
+                <ul className="md:hidden divide-y divide-white/5">
+                    {filtered.length === 0 ? (
+                        <li className="px-6 py-12 text-center text-gray-500">No transactions found matching filters</li>
+                    ) : filtered.map((t) => (
+                        <li key={t.id} className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="bg-brand-500/10 p-2 rounded-lg shrink-0"><Car className="h-4 w-4 text-brand-400" /></div>
+                                    <div className="min-w-0">
+                                        <p className="font-bold text-white uppercase truncate">{t.cars?.car_number}</p>
+                                        <p className="text-[10px] text-gray-500 uppercase truncate">{t.cars?.make} {t.cars?.model}</p>
+                                    </div>
+                                </div>
+                                <Badge className={statusStyles[t.status] || ''}>{t.status}</Badge>
+                            </div>
+                            <div className="mt-3 space-y-1 text-xs">
+                                <p className="flex items-center gap-2 text-gray-300"><User className="h-3.5 w-3.5 text-gray-600 shrink-0" />{t.visitors?.name} <span className="text-gray-600">· {t.visitors?.phone}</span></p>
+                                <p className="flex items-center gap-2 text-gray-400"><MapPin className="h-3.5 w-3.5 shrink-0" />{t.locations?.name || 'N/A'}</p>
+                                <p className="flex items-center gap-2 text-gray-400"><Clock className="h-3 w-3 text-gray-600 shrink-0" /> {formatTime(t.created_at)} · {formatDate(t.created_at)}</p>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left text-sm">
                         <thead className="bg-dark-700/50 text-xs uppercase text-gray-500">
                             <tr>

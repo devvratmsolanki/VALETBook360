@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
@@ -11,7 +12,17 @@ const Layout = ({ children }) => {
             {mobileMenuOpen && (
                 <div className="fixed inset-0 z-50 md:hidden">
                     <div className="fixed inset-0 bg-black/60" onClick={() => setMobileMenuOpen(false)} />
-                    <div className="fixed inset-y-0 left-0 w-64"><Sidebar /></div>
+                    <div className="fixed inset-y-0 left-0 w-64">
+                        <button
+                            type="button"
+                            onClick={() => setMobileMenuOpen(false)}
+                            aria-label="Close menu"
+                            className="absolute top-4 right-3 z-10 p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                        <Sidebar mobile onNavigate={() => setMobileMenuOpen(false)} />
+                    </div>
                 </div>
             )}
             <div className="md:pl-64">

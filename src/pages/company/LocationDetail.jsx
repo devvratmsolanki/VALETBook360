@@ -335,11 +335,11 @@ const LocationDetail = () => {
                 <form onSubmit={handleUpdate} className="space-y-4">
                     <Input label="Display Name" required value={editData.name} onChange={(e) => setEditData({ ...editData, name: e.target.value })} placeholder="Location name" />
                     <Input label="Full Address" value={editData.address} onChange={(e) => setEditData({ ...editData, address: e.target.value })} placeholder="Street address" />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Input label="City" value={editData.city} onChange={(e) => setEditData({ ...editData, city: e.target.value })} placeholder="City" />
                         <Input label="State" value={editData.state} onChange={(e) => setEditData({ ...editData, state: e.target.value })} placeholder="State" />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Input label="Country" value={editData.country} onChange={(e) => setEditData({ ...editData, country: e.target.value })} placeholder="Country" />
                         <Input label="Key Slot Capacity" type="number" min="0" value={editData.key_capacity} onChange={(e) => setEditData({ ...editData, key_capacity: e.target.value })} placeholder="e.g. 50" />
                     </div>
@@ -355,7 +355,7 @@ const LocationDetail = () => {
                     <div className="p-3 bg-brand-500/5 border border-brand-500/10 rounded-2xl">
                         <p className="text-xs text-gray-400 leading-relaxed">System will generate unique labels for your key storage. This will NOT affect active transactions.</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Input label="Label Prefix" value={bulkData.prefix} onChange={(e) => setBulkData({ ...bulkData, prefix: e.target.value })} placeholder="e.g. A, BOX, V" />
                         <Input label="Quantity" type="number" required value={bulkData.count} onChange={(e) => setBulkData({ ...bulkData, count: parseInt(e.target.value) || 0 })} placeholder="30" />
                     </div>

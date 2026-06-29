@@ -40,7 +40,7 @@ const adminNav = [
     settingsItem,
 ];
 
-const Sidebar = () => {
+const Sidebar = ({ mobile = false, onNavigate }) => {
     const location = useLocation();
     const { role, signOut, companyName } = useAuth();
     const { isDark } = useTheme();
@@ -69,7 +69,10 @@ const Sidebar = () => {
 
     return (
         <div className={cn(
-            'hidden border-r md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col transition-colors duration-300',
+            'border-r flex-col transition-colors duration-300',
+            mobile
+                ? 'flex h-full w-64'
+                : 'hidden md:fixed md:inset-y-0 md:flex md:w-64',
             isDark ? 'bg-dark-950 border-white/5' : 'bg-white border-gray-200'
         )}>
             <div className="flex grow flex-col gap-y-5 overflow-y-auto px-5 pb-4">
@@ -109,6 +112,7 @@ const Sidebar = () => {
                                 <li key={item.name}>
                                     <Link
                                         to={item.href}
+                                        onClick={onNavigate}
                                         className={cn(
                                             'group flex gap-x-3 rounded-xl p-2.5 text-sm font-medium border transition-all duration-200',
                                             isActive

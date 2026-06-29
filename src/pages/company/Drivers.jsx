@@ -181,7 +181,7 @@ const Drivers = () => {
 
             <Modal isOpen={showModal} onClose={closeModal} title="Add New Driver">
                 <form onSubmit={handleCreate} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Input
                             label="Name"
                             required
@@ -201,7 +201,7 @@ const Drivers = () => {
                             error={errors.phone}
                         />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Input
                             label="Staff ID"
                             value={formData.staff_id}

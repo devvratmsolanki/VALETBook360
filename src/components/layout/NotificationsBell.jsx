@@ -156,7 +156,7 @@ const NotificationsBell = () => {
             </button>
 
             {open && (
-                <div className="absolute right-0 top-full mt-2 w-96 bg-dark-800 border border-white/10 rounded-2xl shadow-2xl shadow-black/50 z-50 overflow-hidden animate-fade-in">
+                <div className="absolute right-0 top-full mt-2 w-[min(24rem,calc(100vw-2rem))] bg-dark-800 border border-white/10 rounded-2xl shadow-2xl shadow-black/50 z-50 overflow-hidden animate-fade-in">
                     <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
                         <div>
                             <p className="text-sm font-semibold text-white">Notifications</p>

@@ -30,12 +30,16 @@ const CompanyDashboard = () => {
         { label: 'Total Transactions', value: stats.total, icon: Activity, color: 'text-blue-400', bg: 'bg-blue-500/10', href: '/company/transactions' },
     ];
 
+    const go = (href) => (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(href); }
+    };
+
     if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-2 border-brand-500 border-t-transparent rounded-full" /></div>;
 
     return (
         <div className="animate-fade-in">
             <div className="mb-8"><h1 className="text-2xl font-bold text-white">Dashboard</h1><p className="text-sm text-gray-500 mt-1">Overview of your valet operations</p></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">{statCards.map((s) => (<Card key={s.label} className="p-5 cursor-pointer hover:border-brand-500/20 hover:bg-white/[0.02] transition-all group" onClick={() => navigate(s.href)}><div className="flex items-center justify-between"><div><p className="text-sm text-gray-400">{s.label}</p><p className="text-3xl font-bold text-white mt-1">{s.value}</p></div><div className={`${s.bg} p-3 rounded-xl group-hover:scale-110 transition-transform`}><s.icon className={`h-6 w-6 ${s.color}`} /></div></div><div className="flex items-center gap-1 mt-3 text-xs text-gray-600 group-hover:text-brand-400 transition-colors"><span>View details</span><ArrowRight className="h-3 w-3" /></div></Card>))}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">{statCards.map((s) => (<Card key={s.label} role="button" tabIndex={0} aria-label={s.label} onKeyDown={go(s.href)} className="p-5 cursor-pointer hover:border-brand-500/20 hover:bg-white/[0.02] transition-all group" onClick={() => navigate(s.href)}><div className="flex items-center justify-between"><div><p className="text-sm text-gray-400">{s.label}</p><p className="text-3xl font-bold text-white mt-1">{s.value}</p></div><div className={`${s.bg} p-3 rounded-xl group-hover:scale-110 transition-transform`}><s.icon className={`h-6 w-6 ${s.color}`} /></div></div><div className="flex items-center gap-1 mt-3 text-xs text-gray-600 group-hover:text-brand-400 transition-colors"><span>View details</span><ArrowRight className="h-3 w-3" /></div></Card>))}</div>
             <Card className="overflow-hidden">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-white/5"><h3 className="font-semibold text-white">Active Vehicles</h3><Button variant="ghost" size="sm" onClick={() => navigate('/company/transactions')}>View All <ArrowRight className="h-3.5 w-3.5" /></Button></div>
                 {recentTx.length === 0 ? <div className="p-8 text-center"><Car className="h-8 w-8 text-gray-600 mx-auto mb-2" /><p className="text-gray-500 text-sm">No active vehicles</p></div> : (

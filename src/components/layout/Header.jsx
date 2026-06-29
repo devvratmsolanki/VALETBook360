@@ -35,7 +35,7 @@ const Header = ({ onMobileMenu }) => {
 
     return (
         <header className={`sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b backdrop-blur-xl px-6 transition-colors duration-300 ${isDark ? 'border-white/5 bg-dark-900/80' : 'border-gray-200 bg-white/80'}`}>
-            <button type="button" className={`md:hidden transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`} onClick={onMobileMenu}>
+            <button type="button" aria-label="Open menu" className={`md:hidden transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`} onClick={onMobileMenu}>
                 <Menu className="h-6 w-6" />
             </button>
             <div className="flex flex-1 items-center justify-between">
@@ -44,6 +44,7 @@ const Header = ({ onMobileMenu }) => {
                     {/* Theme Toggle */}
                     <button
                         onClick={toggleTheme}
+                        aria-label={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                         className={`p-2 rounded-xl transition-colors ${isDark ? 'text-gray-400 hover:text-white hover:bg-white/5' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
                         title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                     >

@@ -123,14 +123,14 @@ const Users = () => {
                         {totalUsers} users · {adminCount} super admin{adminCount === 1 ? '' : 's'} · {companyCount} {companyCount === 1 ? 'company' : 'companies'}
                     </p>
                 </div>
-                <div className="relative">
+                <div className="relative w-full md:w-auto">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                     <input
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search users or companies..."
-                        className="block w-72 rounded-xl border-0 bg-dark-600 py-2.5 pl-10 pr-4 text-gray-200 placeholder:text-gray-500 ring-1 ring-white/5 focus:ring-2 focus:ring-brand-500/50 sm:text-sm transition-all"
+                        className="block w-full md:w-72 rounded-xl border-0 bg-dark-600 py-2.5 pl-10 pr-4 text-gray-200 placeholder:text-gray-500 ring-1 ring-white/5 focus:ring-2 focus:ring-brand-500/50 sm:text-sm transition-all"
                     />
                 </div>
             </div>
@@ -269,8 +269,61 @@ const EmptyRow = ({ text }) => (
     <div className="px-5 py-6 text-center text-xs text-gray-500">{text}</div>
 );
 
+const RoleControl = ({ u, currentUserId, onRoleChange }) => (
+    (u.id === currentUserId || u.role === 'admin') ? (
+        <span className="text-[10px] text-gray-600 italic" title={u.role === 'admin' ? 'Super admin role can only be changed via SQL' : "You can't change your own role"}>
+            locked
+        </span>
+    ) : (
+        <select
+            value={u.role}
+            onChange={(e) => onRoleChange(u.id, e.target.value)}
+            className="bg-dark-600 text-gray-300 text-[11px] px-2 py-1 rounded-md ring-1 ring-white/5 focus:ring-brand-500/50 cursor-pointer"
+        >
+            {ROLE_ORDER.map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+        </select>
+    )
+);
+
 const UserTable = ({ users, currentUserId, onRoleChange, onDelete }) => (
-    <div className="overflow-x-auto">
+    <>
+    {/* Mobile cards */}
+    <ul className="md:hidden divide-y divide-white/5">
+        {users.map((u) => (
+            <li key={u.id} className="px-5 py-3">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-8 w-8 shrink-0 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-black text-[10px] font-bold">
+                            {u.name?.charAt(0)?.toUpperCase() || '?'}
+                        </div>
+                        <div className="min-w-0">
+                            <p className="font-medium text-white text-sm truncate">{u.name || 'N/A'}</p>
+                            <p className="text-xs text-gray-400 truncate inline-flex items-center gap-1"><Mail className="h-3 w-3 shrink-0" />{u.email || 'N/A'}</p>
+                        </div>
+                    </div>
+                    {u.id !== currentUserId ? (
+                        <button onClick={() => onDelete(u)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors shrink-0" title="Delete user">
+                            <Trash2 className="h-4 w-4" />
+                        </button>
+                    ) : (
+                        <span className="text-[10px] text-gray-600 shrink-0">You</span>
+                    )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 mt-2 ml-11">
+                    <Badge className={ROLE_STYLE[u.role] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}>
+                        {ROLE_LABEL[u.role] || u.role}
+                    </Badge>
+                    <RoleControl u={u} currentUserId={currentUserId} onRoleChange={onRoleChange} />
+                    {u.location?.name && (
+                        <span className="text-xs text-gray-400 inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{u.location.name}</span>
+                    )}
+                </div>
+            </li>
+        ))}
+    </ul>
+
+    {/* Desktop table */}
+    <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left text-sm">
             <thead className="bg-dark-700/30 text-[10px] uppercase text-gray-500">
                 <tr>
@@ -301,28 +354,16 @@ const UserTable = ({ users, currentUserId, onRoleChange, onDelete }) => (
                             ) : <span className="text-gray-600">—</span>}
                         </td>
                         <td className="px-5 py-3">
+                            {/* Super admin role is locked from the UI for two reasons:
+                                1. A logged-in admin must not be able to demote themselves.
+                                2. Other super admins can only be promoted/demoted via SQL,
+                                   to keep the admin tier outside the blast radius of a
+                                   compromised admin session or a UI bug. */}
                             <div className="flex items-center gap-2">
                                 <Badge className={ROLE_STYLE[u.role] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}>
                                     {ROLE_LABEL[u.role] || u.role}
                                 </Badge>
-                                {/* Super admin role is locked from the UI for two reasons:
-                                    1. A logged-in admin must not be able to demote themselves.
-                                    2. Other super admins can only be promoted/demoted via SQL,
-                                       to keep the admin tier outside the blast radius of a
-                                       compromised admin session or a UI bug. */}
-                                {(u.id === currentUserId || u.role === 'admin') ? (
-                                    <span className="text-[10px] text-gray-600 italic" title={u.role === 'admin' ? 'Super admin role can only be changed via SQL' : "You can't change your own role"}>
-                                        locked
-                                    </span>
-                                ) : (
-                                    <select
-                                        value={u.role}
-                                        onChange={(e) => onRoleChange(u.id, e.target.value)}
-                                        className="bg-dark-600 text-gray-300 text-[11px] px-2 py-1 rounded-md ring-1 ring-white/5 focus:ring-brand-500/50 cursor-pointer"
-                                    >
-                                        {ROLE_ORDER.map(r => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
-                                    </select>
-                                )}
+                                <RoleControl u={u} currentUserId={currentUserId} onRoleChange={onRoleChange} />
                             </div>
                         </td>
                         <td className="px-5 py-3 text-right">
@@ -339,6 +380,7 @@ const UserTable = ({ users, currentUserId, onRoleChange, onDelete }) => (
             </tbody>
         </table>
     </div>
+    </>
 );
 
 export default Users;

@@ -165,7 +165,7 @@ const ActiveCars = () => {
                 </Button>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
                 <Card className="p-4 text-center bg-brand-500/5 border-brand-500/10"><p className="text-2xl font-bold text-brand-400">{statusCounts.parked}</p><p className="text-[10px] uppercase text-gray-500 font-semibold mt-1 tracking-wider">Parked</p></Card>
                 <Card className="p-4 text-center bg-amber-500/5 border-amber-500/10"><p className="text-2xl font-bold text-amber-400">{statusCounts.requested}</p><p className="text-[10px] uppercase text-gray-500 font-semibold mt-1 tracking-wider">Requested</p></Card>
                 <Card className="p-4 text-center bg-emerald-500/5 border-emerald-500/10"><p className="text-2xl font-bold text-emerald-400">{statusCounts.ready}</p><p className="text-[10px] uppercase text-gray-500 font-semibold mt-1 tracking-wider">Ready</p></Card>
