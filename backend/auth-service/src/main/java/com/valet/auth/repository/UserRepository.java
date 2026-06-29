@@ -2,6 +2,8 @@ package com.valet.auth.repository;
 
 import com.valet.auth.domain.Role;
 import com.valet.auth.domain.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -19,9 +21,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     /** All users in a company, role-then-name ordered (company drilldown). */
     List<User> findByCompanyIdOrderByRoleAscNameAsc(UUID companyId);
 
+    /** Paged: all users in a company, role-then-name ordered. */
+    Page<User> findByCompanyIdOrderByRoleAscNameAsc(UUID companyId, Pageable pageable);
+
     /** Users in a company filtered to a single role (e.g. operators/drivers). */
     List<User> findByCompanyIdAndRoleOrderByNameAsc(UUID companyId, Role role);
 
+    /** Paged: users in a company filtered to a single role. */
+    Page<User> findByCompanyIdAndRoleOrderByNameAsc(UUID companyId, Role role, Pageable pageable);
+
     /** Every user across every tenant, name-ordered (admin hierarchical list). */
     List<User> findAllByOrderByNameAsc();
+
+    /** Paged: every user across every tenant, name-ordered. */
+    Page<User> findAllByOrderByNameAsc(Pageable pageable);
 }

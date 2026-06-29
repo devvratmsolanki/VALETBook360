@@ -16,6 +16,9 @@ import com.valet.auth.repository.CompanyRepository;
 import com.valet.auth.repository.LocationRepository;
 import com.valet.auth.repository.UserRepository;
 import com.valet.auth.security.AuthPrincipal;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -98,6 +101,20 @@ public class CompanyAdminService {
         // Manager: their own company only.
         Company own = requireOwnCompany(caller);
         return List.of(CompanyResponse.from(own));
+    }
+
+    /**
+     * Paged companies. Admin → all (name-ordered, bounded by {@code pageable});
+     * manager → their single company as a one-element page.
+     */
+    @Transactional(readOnly = true)
+    public Page<CompanyResponse> listCompanies(AuthPrincipal caller, Pageable pageable) {
+        if (isAdmin(caller)) {
+            return companies.findAllByOrderByCompanyNameAsc(pageable)
+                    .map(CompanyResponse::from);
+        }
+        Company own = requireOwnCompany(caller);
+        return new PageImpl<>(List.of(CompanyResponse.from(own)), pageable, 1);
     }
 
     /** Single company overview. Admin → any; manager → own only (else 403). */
@@ -230,6 +247,15 @@ public class CompanyAdminService {
                 .toList();
     }
 
+    /** ADMIN-only paged variant of {@link #listAllLocations(AuthPrincipal)}. */
+    @Transactional(readOnly = true)
+    public Page<LocationResponse> listAllLocations(AuthPrincipal caller, Pageable pageable) {
+        requireAdmin(caller);
+        Map<UUID, String> names = companyNameIndex();
+        return locations.findAllByOrderByNameAsc(pageable)
+                .map(l -> LocationResponse.from(l, names.get(l.getCompanyId())));
+    }
+
     // =====================================================================
     //  Key slots (Location Detail → Key Slots tab)
     // =====================================================================
@@ -326,6 +352,23 @@ public class CompanyAdminService {
                             l == null ? null : l.getState());
                 })
                 .toList();
+    }
+
+    /** Paged variant of {@link #listContracts(AuthPrincipal, UUID)}. */
+    @Transactional(readOnly = true)
+    public Page<com.valet.auth.dto.ContractResponse> listContracts(AuthPrincipal caller,
+                                                                   UUID companyId, Pageable pageable) {
+        loadCompanyAuthorized(caller, companyId);
+        Map<UUID, Location> locIndex = locations.findByCompanyIdOrderByNameAsc(companyId)
+                .stream().collect(Collectors.toMap(Location::getId, l -> l));
+        return contracts.findByCompanyIdOrderByCreatedAtDesc(companyId, pageable)
+                .map(c -> {
+                    Location l = c.getLocationId() == null ? null : locIndex.get(c.getLocationId());
+                    return com.valet.auth.dto.ContractResponse.from(c,
+                            l == null ? null : l.getName(),
+                            l == null ? null : l.getCity(),
+                            l == null ? null : l.getState());
+                });
     }
 
     /** Create a contract under a company. Admin → any; manager → own only. */
@@ -429,6 +472,17 @@ public class CompanyAdminService {
         return found.stream().map(AdminUserResponse::from).toList();
     }
 
+    /** Paged variant of {@link #listCompanyUsers(AuthPrincipal, UUID, Role)}. */
+    @Transactional(readOnly = true)
+    public Page<AdminUserResponse> listCompanyUsers(AuthPrincipal caller, UUID companyId,
+                                                    Role roleFilter, Pageable pageable) {
+        loadCompanyAuthorized(caller, companyId);
+        Page<User> found = (roleFilter == null)
+                ? users.findByCompanyIdOrderByRoleAscNameAsc(companyId, pageable)
+                : users.findByCompanyIdAndRoleOrderByNameAsc(companyId, roleFilter, pageable);
+        return found.map(AdminUserResponse::from);
+    }
+
     /**
      * Create an operator ({@code valet}) or driver ({@code driver}) login under a
      * company. Admin → any company; manager → own only. The role MUST be
@@ -492,6 +546,16 @@ public class CompanyAdminService {
                 .map(u -> AdminUserResponse.from(u,
                         u.getCompanyId() == null ? null : names.get(u.getCompanyId())))
                 .toList();
+    }
+
+    /** ADMIN-only paged variant of {@link #listAllUsers(AuthPrincipal)}. */
+    @Transactional(readOnly = true)
+    public Page<AdminUserResponse> listAllUsers(AuthPrincipal caller, Pageable pageable) {
+        requireAdmin(caller);
+        Map<UUID, String> names = companyNameIndex();
+        return users.findAllByOrderByNameAsc(pageable)
+                .map(u -> AdminUserResponse.from(u,
+                        u.getCompanyId() == null ? null : names.get(u.getCompanyId())));
     }
 
     // =====================================================================

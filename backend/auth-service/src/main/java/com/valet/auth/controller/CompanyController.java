@@ -11,6 +11,7 @@ import com.valet.auth.dto.UpdateLocationRequest;
 import com.valet.auth.exception.ServiceException;
 import com.valet.auth.security.AuthPrincipal;
 import com.valet.auth.service.CompanyAdminService;
+import com.valet.auth.web.Pagination;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -50,10 +51,17 @@ public class CompanyController {
 
     // ----------------------------------------------------------- companies
 
-    /** GET /api/companies — admin: all; manager: their own (1-element list). */
+    /**
+     * GET /api/companies — admin: all; manager: their own (1-element list).
+     * Paginated: {@code ?page=&size=} (defaults to one bounded page); page
+     * metadata is returned in the {@code X-Total-Count}/{@code X-Has-Next}/…
+     * headers (see {@link Pagination}).
+     */
     @GetMapping("/companies")
-    public List<CompanyResponse> listCompanies() {
-        return service.listCompanies(principal());
+    public ResponseEntity<List<CompanyResponse>> listCompanies(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "0") int size) {
+        return Pagination.body(service.listCompanies(principal(), Pagination.of(page, size)));
     }
 
     /** POST /api/companies — ADMIN only. Transactional create-company-with-owner. */
@@ -131,11 +139,16 @@ public class CompanyController {
 
     // ------------------------------------------------------------ contracts
 
-    /** GET /api/companies/{id}/contracts — contracts for a company, newest first. */
+    /**
+     * GET /api/companies/{id}/contracts — contracts for a company, newest first.
+     * Paginated via {@code ?page=&size=} (metadata in {@code X-*} headers).
+     */
     @GetMapping("/companies/{id}/contracts")
-    public List<com.valet.auth.dto.ContractResponse> listContracts(
-            @PathVariable("id") UUID id) {
-        return service.listContracts(principal(), id);
+    public ResponseEntity<List<com.valet.auth.dto.ContractResponse>> listContracts(
+            @PathVariable("id") UUID id,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "0") int size) {
+        return Pagination.body(service.listContracts(principal(), id, Pagination.of(page, size)));
     }
 
     /** POST /api/companies/{id}/contracts — create a contract. */
@@ -170,11 +183,14 @@ public class CompanyController {
      * filtered by role (valet/driver/manager). Admin any; manager own.
      */
     @GetMapping("/companies/{id}/users")
-    public List<AdminUserResponse> listCompanyUsers(@PathVariable("id") UUID id,
-                                                    @RequestParam(value = "role", required = false)
-                                                    String role) {
+    public ResponseEntity<List<AdminUserResponse>> listCompanyUsers(
+            @PathVariable("id") UUID id,
+            @RequestParam(value = "role", required = false) String role,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "0") int size) {
         Role roleFilter = parseRoleFilter(role);
-        return service.listCompanyUsers(principal(), id, roleFilter);
+        return Pagination.body(
+                service.listCompanyUsers(principal(), id, roleFilter, Pagination.of(page, size)));
     }
 
     /**

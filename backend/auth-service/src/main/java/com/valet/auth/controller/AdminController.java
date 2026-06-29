@@ -5,10 +5,13 @@ import com.valet.auth.dto.LocationResponse;
 import com.valet.auth.exception.ServiceException;
 import com.valet.auth.security.AuthPrincipal;
 import com.valet.auth.service.CompanyAdminService;
+import com.valet.auth.web.Pagination;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -28,16 +31,26 @@ public class AdminController {
         this.service = service;
     }
 
-    /** GET /api/admin/locations — every location, each with its companyName. */
+    /**
+     * GET /api/admin/locations — every location, each with its companyName.
+     * Paginated via {@code ?page=&size=} (metadata in {@code X-*} headers).
+     */
     @GetMapping("/locations")
-    public List<LocationResponse> allLocations() {
-        return service.listAllLocations(principal());
+    public ResponseEntity<List<LocationResponse>> allLocations(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "0") int size) {
+        return Pagination.body(service.listAllLocations(principal(), Pagination.of(page, size)));
     }
 
-    /** GET /api/admin/users — every user with company + role, for bucketing. */
+    /**
+     * GET /api/admin/users — every user with company + role, for bucketing.
+     * Paginated via {@code ?page=&size=} (metadata in {@code X-*} headers).
+     */
     @GetMapping("/users")
-    public List<AdminUserResponse> allUsers() {
-        return service.listAllUsers(principal());
+    public ResponseEntity<List<AdminUserResponse>> allUsers(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "0") int size) {
+        return Pagination.body(service.listAllUsers(principal(), Pagination.of(page, size)));
     }
 
     private AuthPrincipal principal() {

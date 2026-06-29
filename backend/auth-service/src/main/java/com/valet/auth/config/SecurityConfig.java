@@ -114,7 +114,10 @@ public class SecurityConfig {
         // that test with -sI (which sends HEAD) produce misleading "no ACAO" output.
         cfg.setAllowedMethods(List.of("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
-        cfg.setExposedHeaders(List.of("Authorization"));
+        // Authorization for token refresh flows; X-* so a browser client can read
+        // the header-based pagination metadata (see com.valet.auth.web.Pagination).
+        cfg.setExposedHeaders(List.of("Authorization", "X-Total-Count", "X-Total-Pages",
+                "X-Page", "X-Page-Size", "X-Has-Next"));
         cfg.setAllowCredentials(true);
         cfg.setMaxAge(3600L);
 
