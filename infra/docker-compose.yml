@@ -66,10 +66,11 @@ services:
       # Comma-separated CORS origin allowlist. Dev default: localhost any-port.
       # Production: set to the exact Flutter/web origins in the host .env.
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*}
-      # In-app help assistant (Claude). Empty = the endpoint returns a friendly
-      # "not configured" message. Set ANTHROPIC_API_KEY in infra/.env to enable.
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-claude-opus-4-8}
+      # In-app help assistant (Google Gemini — free tier, key from
+      # https://aistudio.google.com). Empty = the endpoint returns a friendly
+      # "not configured" message. Set GEMINI_API_KEY in infra/.env to enable.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      ASSISTANT_MODEL: ${ASSISTANT_MODEL:-gemini-2.0-flash}
       # Back-channel URL for the transaction-service (BUG-06 slot-in-use check).
       # Container-to-container: service name + internal port. Local dev default
       # points to the host-exposed port (8092). Override in non-local envs.

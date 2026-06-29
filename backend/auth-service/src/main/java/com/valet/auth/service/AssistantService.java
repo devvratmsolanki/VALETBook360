@@ -6,12 +6,15 @@ import com.valet.auth.dto.AssistantChatRequest;
 import com.valet.auth.exception.ServiceException;
 import com.valet.auth.security.AuthPrincipal;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -19,18 +22,20 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * In-app help assistant — proxies a short, app-aware chat to the Anthropic
- * Messages API. The API key lives ONLY here (server env), never in the client.
- * Raw HTTP (java.net.http) keeps the service dependency-light; the conversation
- * is bounded and the system prompt is role-scoped to THIS product.
+ * In-app help assistant — proxies a short, app-aware chat to the Google Gemini
+ * API (free tier; key from https://aistudio.google.com). The API key lives ONLY
+ * here (server env), never in the client. Raw HTTP keeps the service
+ * dependency-light; the conversation is bounded and the system prompt is
+ * role-scoped to THIS product.
  *
- * Configure via env: ANTHROPIC_API_KEY (required to enable), ASSISTANT_MODEL
- * (optional, default claude-opus-4-8).
+ * Configure via env: GEMINI_API_KEY (required to enable), ASSISTANT_MODEL
+ * (optional, default gemini-2.0-flash).
  */
 @Service
 public class AssistantService {
 
-    private static final String ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+    private static final String GEMINI_BASE =
+            "https://generativelanguage.googleapis.com/v1beta/models/";
     private static final int MAX_TURNS = 20;
     private static final int MAX_CHARS = 4000;
 
@@ -50,10 +55,10 @@ public class AssistantService {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
-    @Value("${ANTHROPIC_API_KEY:}")
+    @Value("${GEMINI_API_KEY:}")
     private String apiKey;
 
-    @Value("${ASSISTANT_MODEL:claude-opus-4-8}")
+    @Value("${ASSISTANT_MODEL:gemini-2.0-flash}")
     private String model;
 
     public AssistantService(ObjectMapper mapper) {
@@ -63,76 +68,82 @@ public class AssistantService {
     public String chat(AuthPrincipal caller, AssistantChatRequest req) {
         if (apiKey == null || apiKey.isBlank()) {
             throw ServiceException.badRequest("ASSISTANT_DISABLED",
-                    "The help assistant isn't configured yet. Set ANTHROPIC_API_KEY.");
+                    "The help assistant isn't configured yet. Set GEMINI_API_KEY.");
         }
 
-        // Validate + clamp the conversation.
+        // Validate + clamp the conversation. Gemini roles are user|model.
         List<AssistantChatRequest.Message> raw = req.messages();
-        List<Map<String, String>> messages = new ArrayList<>();
+        List<Map<String, Object>> contents = new ArrayList<>();
         int from = Math.max(0, raw.size() - MAX_TURNS);
+        String lastRole = null;
         for (int i = from; i < raw.size(); i++) {
             AssistantChatRequest.Message m = raw.get(i);
             if (m == null || m.content() == null || m.content().isBlank()) continue;
-            String role = "assistant".equals(m.role()) ? "assistant" : "user";
-            String content = m.content().length() > MAX_CHARS
+            String role = "assistant".equals(m.role()) ? "model" : "user";
+            String text = m.content().length() > MAX_CHARS
                     ? m.content().substring(0, MAX_CHARS) : m.content();
-            Map<String, String> entry = new LinkedHashMap<>();
+            Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("role", role);
-            entry.put("content", content);
-            messages.add(entry);
+            entry.put("parts", List.of(Map.of("text", text)));
+            contents.add(entry);
+            lastRole = role;
         }
-        if (messages.isEmpty() || !"user".equals(messages.get(messages.size() - 1).get("role"))) {
+        if (contents.isEmpty() || !"user".equals(lastRole)) {
             throw ServiceException.badRequest("INVALID_MESSAGES",
                     "The last message must be from the user.");
         }
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", model);
-        body.put("max_tokens", 1024);
-        body.put("system", systemPrompt(caller));
-        body.put("messages", messages);
+        body.put("system_instruction",
+                Map.of("parts", List.of(Map.of("text", systemPrompt(caller)))));
+        body.put("contents", contents);
+        body.put("generationConfig", Map.of("maxOutputTokens", 1024, "temperature", 0.4));
 
         final HttpResponse<String> resp;
         try {
+            String url = GEMINI_BASE + URLEncoder.encode(model, StandardCharsets.UTF_8)
+                    + ":generateContent";
             String payload = mapper.writeValueAsString(body);
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(ANTHROPIC_URL))
+                    .uri(URI.create(url))
                     .timeout(Duration.ofSeconds(45))
-                    .header("x-api-key", apiKey)
-                    .header("anthropic-version", "2023-06-01")
+                    .header("x-goog-api-key", apiKey)
                     .header("content-type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
                     .build();
             resp = http.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (Exception e) {
-            throw new ServiceException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+            throw new ServiceException(HttpStatus.BAD_GATEWAY,
                     "ASSISTANT_UNAVAILABLE", "The assistant couldn't respond right now. Please try again.");
         }
 
         if (resp.statusCode() / 100 != 2) {
-            // Don't leak upstream internals.
             String msg = resp.statusCode() == 429
                     ? "The assistant is busy right now — please try again in a moment."
                     : "The assistant couldn't respond right now. Please try again.";
-            throw new ServiceException(org.springframework.http.HttpStatus.BAD_GATEWAY,
-                    "ASSISTANT_UNAVAILABLE", msg);
+            throw new ServiceException(HttpStatus.BAD_GATEWAY, "ASSISTANT_UNAVAILABLE", msg);
         }
 
         try {
             JsonNode root = mapper.readTree(resp.body());
-            if ("refusal".equals(root.path("stop_reason").asText())) {
+            // Prompt-level block (safety) → graceful message.
+            String block = root.path("promptFeedback").path("blockReason").asText("");
+            if (!block.isEmpty()) {
                 return "I can't help with that one — I'm here for questions about using LogBook360.";
             }
+            JsonNode cand = root.path("candidates").path(0);
+            String finish = cand.path("finishReason").asText("");
             StringBuilder sb = new StringBuilder();
-            for (JsonNode block : root.path("content")) {
-                if ("text".equals(block.path("type").asText())) {
-                    sb.append(block.path("text").asText());
-                }
+            for (JsonNode part : cand.path("content").path("parts")) {
+                sb.append(part.path("text").asText());
             }
             String reply = sb.toString().trim();
+            if (reply.isEmpty() && "SAFETY".equals(finish)) {
+                return "I can't help with that one — I'm here for questions about using LogBook360.";
+            }
             return reply.isEmpty() ? "Sorry, I didn't catch that — could you rephrase?" : reply;
         } catch (Exception e) {
-            throw new ServiceException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+            throw new ServiceException(HttpStatus.BAD_GATEWAY,
                     "ASSISTANT_UNAVAILABLE", "The assistant couldn't respond right now. Please try again.");
         }
     }
