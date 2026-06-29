@@ -16,9 +16,10 @@ const Staff = () => {
     const [locations, setLocations] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Edit state
-    const [editingId, setEditingId] = useState(null);
-    const [editForm, setEditForm] = useState({ role: '', location_id: '' });
+    // Edit state (modal)
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editForm, setEditForm] = useState({ id: null, name: '', role: 'valet', location_id: '' });
+    const [savingEdit, setSavingEdit] = useState(false);
 
     // Add state
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -45,21 +46,27 @@ const Staff = () => {
     }, [companyId]);
 
     const startEdit = (user) => {
-        setEditingId(user.id);
-        setEditForm({ role: user.role, location_id: user.location_id || '' });
+        setEditForm({ id: user.id, name: user.name || '', role: user.role, location_id: user.location_id || '' });
+        setIsEditModalOpen(true);
     };
 
-    const handleSave = async (id) => {
+    const handleSaveEdit = async (e) => {
+        e.preventDefault();
+        if (!editForm.name.trim() || editForm.name.trim().length < 2) return toast.error('Name must be at least 2 characters');
+        setSavingEdit(true);
         try {
-            await updateUser(id, {
+            await updateUser(editForm.id, {
+                name: editForm.name.trim(),
                 role: editForm.role,
-                location_id: editForm.location_id === '' ? null : editForm.location_id
+                location_id: editForm.role === 'valet' ? (editForm.location_id || null) : null,
             });
             toast.success('Staff member updated');
-            setEditingId(null);
+            setIsEditModalOpen(false);
             fetchData();
         } catch (err) {
-            toast.error(err?.message || 'Failed to update staff member');
+            toast.error(err.userMessage || err.message);
+        } finally {
+            setSavingEdit(false);
         }
     };
 
@@ -100,7 +107,6 @@ const Staff = () => {
         }
     };
 
-    const roles = ['company', 'valet'];
     const getRoleStyle = (r) => ({
         company: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
         valet: 'bg-brand-500/10 text-brand-400 border-brand-500/20'
@@ -173,6 +179,48 @@ const Staff = () => {
                 </div>
             )}
 
+            {/* Edit Member Modal */}
+            {isEditModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <Card className="w-full max-w-md p-6 animate-in slide-in-from-bottom-4">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-xl font-bold text-white">Edit Team Member</h2>
+                            <button onClick={() => setIsEditModalOpen(false)} aria-label="Close" className="text-gray-400 hover:text-white"><X className="h-5 w-5" /></button>
+                        </div>
+                        <form onSubmit={handleSaveEdit} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-400 mb-1">Full Name</label>
+                                <input type="text" required value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className="w-full bg-dark-600 border-white/5 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-brand-500/50" placeholder="John Doe" />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-400 mb-1">Role</label>
+                                    <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })} className="w-full bg-dark-600 border-white/5 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-brand-500/50">
+                                        <option value="valet">Valet</option>
+                                        <option value="company">Company Staff</option>
+                                    </select>
+                                </div>
+                                {editForm.role === 'valet' && (
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-400 mb-1">Location</label>
+                                        <select value={editForm.location_id} onChange={e => setEditForm({ ...editForm, location_id: e.target.value })} className="w-full bg-dark-600 border-white/5 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-brand-500/50">
+                                            <option value="">Unassigned</option>
+                                            {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex gap-3 pt-4">
+                                <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)} className="flex-1">Cancel</Button>
+                                <Button type="submit" disabled={savingEdit} className="flex-1">
+                                    {savingEdit ? 'Saving...' : 'Save Changes'}
+                                </Button>
+                            </div>
+                        </form>
+                    </Card>
+                </div>
+            )}
+
             {staff.length === 0 ? (
                 <Card className="p-8 text-center text-gray-500">No staff members found.</Card>
             ) : (
@@ -202,57 +250,25 @@ const Staff = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            {editingId === u.id ? (
-                                                <select
-                                                    value={editForm.role}
-                                                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                                                    className="bg-dark-600 border-white/10 text-gray-200 text-xs rounded-lg px-2 py-1"
-                                                >
-                                                    {roles.map(r => <option key={r} value={r}>{r}</option>)}
-                                                </select>
-                                            ) : (
-                                                <Badge className={getRoleStyle(u.role)}>{u.role}</Badge>
-                                            )}
+                                            <Badge className={getRoleStyle(u.role)}>{u.role}</Badge>
                                         </td>
                                         <td className="px-6 py-4">
-                                            {editingId === u.id && u.role === 'valet' ? (
-                                                <select
-                                                    value={editForm.location_id}
-                                                    onChange={(e) => setEditForm({ ...editForm, location_id: e.target.value })}
-                                                    className="bg-dark-600 border-white/10 text-gray-200 text-xs rounded-lg px-2 py-1 w-full max-w-[200px]"
-                                                >
-                                                    <option value="">No Location (Mobile/Floating)</option>
-                                                    {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                                                </select>
-                                            ) : (
-                                                <div className="flex items-center gap-2 text-gray-400">
-                                                    <MapPin className="h-3.5 w-3.5" />
-                                                    <span className="text-sm">{u.location?.name || 'Unassigned'}</span>
-                                                </div>
-                                            )}
+                                            <div className="flex items-center gap-2 text-gray-400">
+                                                <MapPin className="h-3.5 w-3.5" />
+                                                <span className="text-sm">{u.location?.name || 'Unassigned'}</span>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            {editingId === u.id ? (
-                                                <div className="flex justify-end gap-2">
-                                                    <button onClick={() => handleSave(u.id)} className="p-1.5 rounded-lg bg-brand-500/20 text-brand-400 hover:bg-brand-500/30">
-                                                        <Check className="h-4 w-4" />
+                                            <div className="flex justify-end gap-2 text-gray-600">
+                                                <button onClick={() => startEdit(u)} aria-label="Edit member" className="p-1.5 rounded-lg hover:bg-white/5 hover:text-white transition-colors">
+                                                    <Edit2 className="h-4 w-4" />
+                                                </button>
+                                                {u.id !== currentUser?.id && (
+                                                    <button onClick={() => handleDelete(u)} aria-label="Remove member" className="p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-400 transition-colors">
+                                                        <Trash2 className="h-4 w-4" />
                                                     </button>
-                                                    <button onClick={() => setEditingId(null)} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10">
-                                                        <X className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <div className="flex justify-end gap-2 text-gray-600">
-                                                    <button onClick={() => startEdit(u)} className="p-1.5 rounded-lg hover:bg-white/5 hover:text-white transition-colors">
-                                                        <Edit2 className="h-4 w-4" />
-                                                    </button>
-                                                    {u.id !== currentUser?.id && (
-                                                        <button onClick={() => handleDelete(u)} className="p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-400 transition-colors">
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

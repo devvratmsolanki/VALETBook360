@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getDriversByCompany, createDriver, toggleDriverActive, deleteDriver } from '../../services/driverService';
+import { getDriversByCompany, createDriver, updateDriver, toggleDriverActive, deleteDriver } from '../../services/driverService';
 import { getLocationsByCompany } from '../../services/locationService';
 import { createStaff } from '../../services/userService';
 import { isValidEmail, isValidPhone, isValidPassword, normalizePhone } from '../../lib/utils';
@@ -11,7 +11,7 @@ import Input from '../../components/ui/Input';
 import Badge from '../../components/ui/Badge';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { toast } from '../../components/ui/Toast';
-import { Users, Plus, Phone, CreditCard, UserCheck, UserX, Mail, Key, MapPin, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Users, Plus, Phone, CreditCard, UserCheck, UserX, Mail, Key, MapPin, Eye, EyeOff, Trash2, Edit2 } from 'lucide-react';
 
 const emptyForm = {
     name: '', phone: '', license_number: '', staff_id: '',
@@ -28,6 +28,12 @@ const Drivers = () => {
     const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
     const [showPwd, setShowPwd] = useState(false);
+
+    // Edit state
+    const [editModal, setEditModal] = useState(false);
+    const [editData, setEditData] = useState({ id: null, name: '', phone: '', license_number: '', staff_id: '', location_id: '' });
+    const [editErrors, setEditErrors] = useState({});
+    const [savingEdit, setSavingEdit] = useState(false);
 
     const fetchAll = async () => {
         if (!companyId) { setLoading(false); return; }
@@ -103,6 +109,45 @@ const Drivers = () => {
         }
     };
 
+    const startEdit = (d) => {
+        setEditData({
+            id: d.id,
+            name: d.name || '',
+            phone: d.phone || '',
+            license_number: d.license_number || '',
+            staff_id: d.staff_id || '',
+            location_id: d.location_id || '',
+        });
+        setEditErrors({});
+        setEditModal(true);
+    };
+
+    const handleEdit = async (e) => {
+        e.preventDefault();
+        const next = {};
+        if (!editData.name.trim() || editData.name.trim().length < 2) next.name = 'Name must be at least 2 characters';
+        if (!isValidPhone(editData.phone)) next.phone = 'Enter a valid phone (7–15 digits)';
+        setEditErrors(next);
+        if (Object.keys(next).length) return;
+        setSavingEdit(true);
+        try {
+            await updateDriver(editData.id, {
+                name: editData.name.trim(),
+                phone: normalizePhone(editData.phone),
+                license_number: editData.license_number.trim() || null,
+                staff_id: editData.staff_id.trim() || null,
+                location_id: editData.location_id || null,
+            });
+            toast.success('Driver updated');
+            setEditModal(false);
+            fetchAll();
+        } catch (err) {
+            toast.error(err.userMessage || err.message);
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
     const handleToggle = async (id, active) => {
         try {
             await toggleDriverActive(id, !active);
@@ -166,6 +211,9 @@ const Drivers = () => {
                                             <Badge className={d.active ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-gray-500/10 text-gray-500 border-gray-500/20'}>
                                                 {d.active ? 'Active' : 'Inactive'}
                                             </Badge>
+                                            <button onClick={() => startEdit(d)} aria-label="Edit driver" className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors" title="Edit driver">
+                                                <Edit2 className="h-4 w-4" />
+                                            </button>
                                             <button onClick={() => handleToggle(d.id, d.active)} className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors" title={d.active ? 'Deactivate' : 'Activate'}>
                                                 {d.active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
                                             </button>
@@ -284,6 +332,64 @@ const Drivers = () => {
                     <div className="flex justify-end gap-3 pt-2">
                         <Button variant="ghost" type="button" onClick={closeModal}>Cancel</Button>
                         <Button type="submit" disabled={saving}>{saving ? 'Adding...' : 'Add Driver'}</Button>
+                    </div>
+                </form>
+            </Modal>
+
+            <Modal isOpen={editModal} onClose={() => setEditModal(false)} title="Edit Driver">
+                <form onSubmit={handleEdit} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Input
+                            label="Name"
+                            required
+                            value={editData.name}
+                            onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                            placeholder="Driver name"
+                            error={editErrors.name}
+                        />
+                        <Input
+                            icon={Phone}
+                            label="Phone"
+                            required
+                            inputMode="tel"
+                            value={editData.phone}
+                            onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                            placeholder="e.g. 9876543210"
+                            error={editErrors.phone}
+                        />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Input
+                            label="Staff ID"
+                            value={editData.staff_id}
+                            onChange={(e) => setEditData({ ...editData, staff_id: e.target.value })}
+                            placeholder="e.g. D-101"
+                        />
+                        <Input
+                            icon={CreditCard}
+                            label="License Number"
+                            value={editData.license_number}
+                            onChange={(e) => setEditData({ ...editData, license_number: e.target.value })}
+                            placeholder="License number"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-medium text-gray-300">Assigned Location</label>
+                        <div className="relative">
+                            <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                            <select
+                                value={editData.location_id}
+                                onChange={(e) => setEditData({ ...editData, location_id: e.target.value })}
+                                className="block w-full rounded-xl border-0 bg-dark-600 py-3 pl-10 pr-4 text-gray-200 ring-1 ring-inset ring-white/5 focus:ring-2 focus:ring-brand-500/50 sm:text-sm transition-all"
+                            >
+                                <option value="">Unassigned</option>
+                                {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2">
+                        <Button variant="ghost" type="button" onClick={() => setEditModal(false)}>Cancel</Button>
+                        <Button type="submit" disabled={savingEdit}>{savingEdit ? 'Saving...' : 'Save Changes'}</Button>
                     </div>
                 </form>
             </Modal>

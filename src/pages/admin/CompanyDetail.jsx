@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { getLocationsByCompany, deleteLocation } from '../../services/locationService';
-import { getDriversByCompany, deleteDriver, toggleDriverActive } from '../../services/driverService';
-import { getUsersByCompany, deleteUser } from '../../services/userService';
+import { getDriversByCompany, deleteDriver, toggleDriverActive, updateDriver } from '../../services/driverService';
+import { getUsersByCompany, deleteUser, updateUser } from '../../services/userService';
 import { syncSlotsWithCapacity } from '../../services/slotService';
 import { createLocation } from '../../services/locationService';
 import { createStaff } from '../../services/userService';
@@ -19,7 +19,7 @@ import { toast } from '../../components/ui/Toast';
 import logger from '../../lib/logger';
 import {
     ArrowLeft, Building2, MapPin, Users, Car, Plus, Trash2,
-    Phone, Mail, UserCheck, UserX, Key, Eye, EyeOff, Shield
+    Phone, Mail, UserCheck, UserX, Key, Eye, EyeOff, Shield, Edit2
 } from 'lucide-react';
 
 const TABS = [
@@ -283,6 +283,31 @@ const OperatorsTab = ({ companyId, operators, locations, onRefresh }) => {
     const [showPwd, setShowPwd] = useState(false);
     const [saving, setSaving] = useState(false);
 
+    const [editModal, setEditModal] = useState(false);
+    const [editForm, setEditForm] = useState({ id: null, name: '', location_id: '' });
+    const [savingEdit, setSavingEdit] = useState(false);
+
+    const startEdit = (o) => {
+        setEditForm({ id: o.id, name: o.name || '', location_id: o.location_id || '' });
+        setEditModal(true);
+    };
+
+    const handleEdit = async (e) => {
+        e.preventDefault();
+        if (!editForm.name.trim() || editForm.name.trim().length < 2) return toast.error('Name too short');
+        setSavingEdit(true);
+        try {
+            await updateUser(editForm.id, { name: editForm.name.trim(), location_id: editForm.location_id || null });
+            toast.success('Operator updated');
+            setEditModal(false);
+            onRefresh();
+        } catch (err) {
+            toast.error(err.userMessage || err.message);
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!form.name.trim() || form.name.trim().length < 2) return toast.error('Name too short');
@@ -349,9 +374,14 @@ const OperatorsTab = ({ companyId, operators, locations, onRefresh }) => {
                                     <td className="px-5 py-3 text-gray-400 text-xs"><span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" />{o.email}</span></td>
                                     <td className="px-5 py-3 text-gray-400 text-xs">{o.location?.name || <span className="text-gray-600">—</span>}</td>
                                     <td className="px-5 py-3 text-right">
-                                        <button onClick={() => handleDelete(o)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors">
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
+                                        <div className="flex justify-end gap-1">
+                                            <button onClick={() => startEdit(o)} aria-label="Edit operator" className="p-1.5 rounded-lg hover:bg-white/5 text-gray-600 hover:text-white transition-colors">
+                                                <Edit2 className="h-4 w-4" />
+                                            </button>
+                                            <button onClick={() => handleDelete(o)} aria-label="Remove operator" className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors">
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -384,6 +414,29 @@ const OperatorsTab = ({ companyId, operators, locations, onRefresh }) => {
                     </div>
                 </form>
             </Modal>
+
+            <Modal isOpen={editModal} onClose={() => setEditModal(false)} title="Edit Operator">
+                <form onSubmit={handleEdit} className="space-y-4">
+                    <Input label="Name" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Operator name" />
+                    {locations.length > 0 && (
+                        <div className="space-y-1.5">
+                            <label className="block text-sm font-medium text-gray-300">Assigned Location</label>
+                            <select
+                                value={editForm.location_id}
+                                onChange={(e) => setEditForm({ ...editForm, location_id: e.target.value })}
+                                className="block w-full rounded-xl border-0 bg-dark-600 py-3 px-4 text-gray-200 ring-1 ring-inset ring-white/5 focus:ring-2 focus:ring-brand-500/50 text-sm transition-all"
+                            >
+                                <option value="">Unassigned</option>
+                                {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                            </select>
+                        </div>
+                    )}
+                    <div className="flex justify-end gap-3 pt-2">
+                        <Button variant="ghost" type="button" onClick={() => setEditModal(false)}>Cancel</Button>
+                        <Button type="submit" disabled={savingEdit}>{savingEdit ? 'Saving...' : 'Save Changes'}</Button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };
@@ -397,6 +450,36 @@ const DriversTab = ({ companyId, drivers, locations, onRefresh }) => {
     });
     const [showPwd, setShowPwd] = useState(false);
     const [saving, setSaving] = useState(false);
+
+    const [editModal, setEditModal] = useState(false);
+    const [editForm, setEditForm] = useState({ id: null, name: '', phone: '', location_id: '' });
+    const [savingEdit, setSavingEdit] = useState(false);
+
+    const startEdit = (d) => {
+        setEditForm({ id: d.id, name: d.name || '', phone: d.phone || '', location_id: d.location_id || '' });
+        setEditModal(true);
+    };
+
+    const handleEdit = async (e) => {
+        e.preventDefault();
+        if (!editForm.name.trim() || editForm.name.trim().length < 2) return toast.error('Name too short');
+        if (!isValidPhone(editForm.phone)) return toast.error('Invalid phone (7–15 digits)');
+        setSavingEdit(true);
+        try {
+            await updateDriver(editForm.id, {
+                name: editForm.name.trim(),
+                phone: normalizePhone(editForm.phone),
+                location_id: editForm.location_id || null,
+            });
+            toast.success('Driver updated');
+            setEditModal(false);
+            onRefresh();
+        } catch (err) {
+            toast.error(err.userMessage || err.message);
+        } finally {
+            setSavingEdit(false);
+        }
+    };
 
     const handleCreate = async (e) => {
         e.preventDefault();
@@ -492,6 +575,9 @@ const DriversTab = ({ companyId, drivers, locations, onRefresh }) => {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
+                                    <button onClick={() => startEdit(d)} aria-label="Edit driver" className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white" title="Edit">
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                    </button>
                                     <button onClick={() => handleToggle(d)} className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white" title={d.active ? 'Deactivate' : 'Activate'}>
                                         {d.active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
                                     </button>
@@ -538,6 +624,32 @@ const DriversTab = ({ companyId, drivers, locations, onRefresh }) => {
                     <div className="flex justify-end gap-3 pt-2">
                         <Button variant="ghost" type="button" onClick={() => setShowModal(false)}>Cancel</Button>
                         <Button type="submit" disabled={saving}>{saving ? 'Adding...' : 'Add Driver'}</Button>
+                    </div>
+                </form>
+            </Modal>
+
+            <Modal isOpen={editModal} onClose={() => setEditModal(false)} title="Edit Driver">
+                <form onSubmit={handleEdit} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Input label="Name" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+                        <Input icon={Phone} label="Phone" required inputMode="tel" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+                    </div>
+                    {locations.length > 0 && (
+                        <div className="space-y-1.5">
+                            <label className="block text-sm font-medium text-gray-300">Assigned Location</label>
+                            <select
+                                value={editForm.location_id}
+                                onChange={(e) => setEditForm({ ...editForm, location_id: e.target.value })}
+                                className="block w-full rounded-xl border-0 bg-dark-600 py-3 px-4 text-gray-200 ring-1 ring-inset ring-white/5 focus:ring-2 focus:ring-brand-500/50 text-sm transition-all"
+                            >
+                                <option value="">Unassigned</option>
+                                {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                            </select>
+                        </div>
+                    )}
+                    <div className="flex justify-end gap-3 pt-2">
+                        <Button variant="ghost" type="button" onClick={() => setEditModal(false)}>Cancel</Button>
+                        <Button type="submit" disabled={savingEdit}>{savingEdit ? 'Saving...' : 'Save Changes'}</Button>
                     </div>
                 </form>
             </Modal>

@@ -1,13 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getUsers, updateUserRole, deleteUser } from '../../services/userService';
+import { getUsers, updateUserRole, updateUser, deleteUser } from '../../services/userService';
 import { getCompanies } from '../../services/companyService';
+import { getLocationsByCompany } from '../../services/locationService';
 import { useAuth } from '../../contexts/AuthContext';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
+import Modal from '../../components/ui/Modal';
+import Input from '../../components/ui/Input';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { toast } from '../../components/ui/Toast';
 import {
-    Users as UsersIcon, Search, Shield, Mail, Trash2, Building2,
+    Users as UsersIcon, Search, Shield, Mail, Trash2, Edit2, Building2,
     ChevronDown, ChevronRight, MapPin, Car, UserCog
 } from 'lucide-react';
 
@@ -31,6 +35,10 @@ const Users = () => {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [collapsed, setCollapsed] = useState({}); // { [companyId]: true }
+    const [editUser, setEditUser] = useState(null);
+    const [editForm, setEditForm] = useState({ name: '', location_id: '' });
+    const [editLocations, setEditLocations] = useState([]);
+    const [savingEdit, setSavingEdit] = useState(false);
 
     const fetchAll = async () => {
         try {
@@ -96,6 +104,35 @@ const Users = () => {
         }
     };
 
+    const startEdit = async (u) => {
+        setEditUser(u);
+        setEditForm({ name: u.name || '', location_id: u.location_id || '' });
+        setEditLocations([]);
+        if (u.valet_company_id) {
+            try {
+                setEditLocations(await getLocationsByCompany(u.valet_company_id));
+            } catch (err) {
+                toast.error(err.userMessage || err.message);
+            }
+        }
+    };
+
+    const handleSaveEdit = async (e) => {
+        e.preventDefault();
+        if (!editForm.name.trim() || editForm.name.trim().length < 2) return toast.error('Name must be at least 2 characters');
+        setSavingEdit(true);
+        try {
+            await updateUser(editUser.id, { name: editForm.name.trim(), location_id: editForm.location_id || null });
+            toast.success('User updated');
+            setEditUser(null);
+            fetchAll();
+        } catch (err) {
+            toast.error(err.userMessage || err.message);
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
     const handleDelete = async (u) => {
         if (u.id === currentUser?.id) return toast.error("You can't delete your own account");
         if (!confirm(`Delete user "${u.name || u.email}"? This removes their profile row but the auth login may persist.`)) return;
@@ -155,6 +192,7 @@ const Users = () => {
                                 currentUserId={currentUser?.id}
                                 onRoleChange={handleRoleChange}
                                 onDelete={handleDelete}
+                                onEdit={startEdit}
                             />
                         )}
                     </Section>
@@ -200,6 +238,7 @@ const Users = () => {
                                             currentUserId={currentUser?.id}
                                             onRoleChange={handleRoleChange}
                                             onDelete={handleDelete}
+                                            onEdit={startEdit}
                                         />
                                         <RoleBucket
                                             label="Operators"
@@ -208,6 +247,7 @@ const Users = () => {
                                             currentUserId={currentUser?.id}
                                             onRoleChange={handleRoleChange}
                                             onDelete={handleDelete}
+                                            onEdit={startEdit}
                                         />
                                         <RoleBucket
                                             label="Drivers"
@@ -216,6 +256,7 @@ const Users = () => {
                                             currentUserId={currentUser?.id}
                                             onRoleChange={handleRoleChange}
                                             onDelete={handleDelete}
+                                            onEdit={startEdit}
                                         />
                                     </div>
                                 )}
@@ -224,6 +265,27 @@ const Users = () => {
                     })}
                 </div>
             )}
+
+            <Modal isOpen={!!editUser} onClose={() => setEditUser(null)} title="Edit User">
+                <form onSubmit={handleSaveEdit} className="space-y-4">
+                    <Input label="Full Name" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Full name" />
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-medium text-gray-300">Assigned Location</label>
+                        <select
+                            value={editForm.location_id}
+                            onChange={(e) => setEditForm({ ...editForm, location_id: e.target.value })}
+                            className="block w-full rounded-xl border-0 bg-dark-600 py-3 px-4 text-gray-200 ring-1 ring-inset ring-white/5 focus:ring-2 focus:ring-brand-500/50 text-sm transition-all"
+                        >
+                            <option value="">Unassigned</option>
+                            {editLocations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2">
+                        <Button variant="ghost" type="button" onClick={() => setEditUser(null)}>Cancel</Button>
+                        <Button type="submit" disabled={savingEdit}>{savingEdit ? 'Saving...' : 'Save Changes'}</Button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };
@@ -250,7 +312,7 @@ const Section = ({ title, subtitle, icon, accent, count, children }) => {
 );
 };
 
-const RoleBucket = ({ label, role, users, currentUserId, onRoleChange, onDelete }) => {
+const RoleBucket = ({ label, role, users, currentUserId, onRoleChange, onDelete, onEdit }) => {
     if (users.length === 0) return null;
     const BucketIcon = ROLE_ICON[role] || UsersIcon;
     return (
@@ -260,7 +322,7 @@ const RoleBucket = ({ label, role, users, currentUserId, onRoleChange, onDelete 
                 <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold">{label}</p>
                 <span className="text-xs text-gray-600">({users.length})</span>
             </div>
-            <UserTable users={users} currentUserId={currentUserId} onRoleChange={onRoleChange} onDelete={onDelete} />
+            <UserTable users={users} currentUserId={currentUserId} onRoleChange={onRoleChange} onDelete={onDelete} onEdit={onEdit} />
         </div>
     );
 };
@@ -285,7 +347,7 @@ const RoleControl = ({ u, currentUserId, onRoleChange }) => (
     )
 );
 
-const UserTable = ({ users, currentUserId, onRoleChange, onDelete }) => (
+const UserTable = ({ users, currentUserId, onRoleChange, onDelete, onEdit }) => (
     <>
     {/* Mobile cards */}
     <ul className="md:hidden divide-y divide-white/5">
@@ -301,13 +363,18 @@ const UserTable = ({ users, currentUserId, onRoleChange, onDelete }) => (
                             <p className="text-xs text-gray-400 truncate inline-flex items-center gap-1"><Mail className="h-3 w-3 shrink-0" />{u.email || 'N/A'}</p>
                         </div>
                     </div>
-                    {u.id !== currentUserId ? (
-                        <button onClick={() => onDelete(u)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors shrink-0" title="Delete user">
-                            <Trash2 className="h-4 w-4" />
+                    <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => onEdit(u)} aria-label="Edit user" className="p-1.5 rounded-lg hover:bg-white/5 text-gray-600 hover:text-white transition-colors" title="Edit user">
+                            <Edit2 className="h-4 w-4" />
                         </button>
-                    ) : (
-                        <span className="text-[10px] text-gray-600 shrink-0">You</span>
-                    )}
+                        {u.id !== currentUserId ? (
+                            <button onClick={() => onDelete(u)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors" title="Delete user">
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                        ) : (
+                            <span className="text-[10px] text-gray-600 self-center">You</span>
+                        )}
+                    </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mt-2 ml-11">
                     <Badge className={ROLE_STYLE[u.role] || 'bg-gray-500/10 text-gray-400 border-gray-500/20'}>
@@ -367,13 +434,18 @@ const UserTable = ({ users, currentUserId, onRoleChange, onDelete }) => (
                             </div>
                         </td>
                         <td className="px-5 py-3 text-right">
-                            {u.id !== currentUserId ? (
-                                <button onClick={() => onDelete(u)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors" title="Delete user">
-                                    <Trash2 className="h-4 w-4" />
+                            <div className="flex justify-end gap-1">
+                                <button onClick={() => onEdit(u)} aria-label="Edit user" className="p-1.5 rounded-lg hover:bg-white/5 text-gray-600 hover:text-white transition-colors" title="Edit user">
+                                    <Edit2 className="h-4 w-4" />
                                 </button>
-                            ) : (
-                                <span className="text-[10px] text-gray-600">You</span>
-                            )}
+                                {u.id !== currentUserId ? (
+                                    <button onClick={() => onDelete(u)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors" title="Delete user">
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                ) : (
+                                    <span className="text-[10px] text-gray-600 self-center">You</span>
+                                )}
+                            </div>
                         </td>
                     </tr>
                 ))}
