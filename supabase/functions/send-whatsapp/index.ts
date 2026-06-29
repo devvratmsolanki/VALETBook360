@@ -180,7 +180,11 @@ _Deno.serve(async (req: Request) => {
             .select("role")
             .eq("id", user.id)
             .maybeSingle();
-        if (!profile || !["admin", "company", "valet", "driver"].includes(profile.role)) {
+        // Drivers must NOT be able to blast WhatsApp templates — only the floor
+        // roles that legitimately notify guests (admin / company / valet). A
+        // driver token previously passed this gate and could send pre-approved
+        // templates to any phone number worldwide.
+        if (!profile || !["admin", "company", "valet"].includes(profile.role)) {
             return new Response(
                 JSON.stringify({ error: "Forbidden" }),
                 { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -192,6 +196,16 @@ _Deno.serve(async (req: Request) => {
         if (!phone || !templateName) {
             return new Response(
                 JSON.stringify({ error: "Missing required fields: phone, templateName" }),
+                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
+        // Validate the destination phone (E.164-ish: 7–15 digits after stripping
+        // separators) so this endpoint can't be used to message arbitrary junk.
+        const cleanPhone = String(phone).replace(/\D/g, "");
+        if (cleanPhone.length < 7 || cleanPhone.length > 15) {
+            return new Response(
+                JSON.stringify({ error: "Invalid phone number" }),
                 { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }

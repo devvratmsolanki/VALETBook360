@@ -212,8 +212,10 @@ Deno.serve(async (req: Request) => {
         });
 
     } catch (err) {
-        console.error("Webhook processing error:", err.message);
-        return new Response(JSON.stringify({ error: err.message }), {
+        // Log the detail server-side, but return a generic message — err.message
+        // can carry Postgres schema/column details that must not reach a caller.
+        console.error("Webhook processing error:", (err as Error).message);
+        return new Response(JSON.stringify({ error: "internal_error" }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
         });

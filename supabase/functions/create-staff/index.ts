@@ -49,6 +49,21 @@ Deno.serve(async (req: Request) => {
 
         const { email, password, name, role, company_id, location_id } = await req.json();
 
+        // Server-side role allowlist — NEVER trust the caller-supplied `role`.
+        // Without this a company-authenticated user could POST { role: "company" }
+        // (or "admin") and mint a co-owner / escalate privileges. An admin may
+        // provision any tenant role; a company owner may only create operator
+        // (valet) or driver staff.
+        const ALLOWED_ROLES = requesterProfile.role === "admin"
+            ? ["admin", "company", "valet", "driver"]
+            : ["valet", "driver"];
+        if (!role || !ALLOWED_ROLES.includes(role)) {
+            return new Response(JSON.stringify({ error: "Unauthorized: role not permitted" }), {
+                status: 403,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
         // Ensure company owners can only create users for their own company
         if (requesterProfile.role === "company" && company_id !== requesterProfile.valet_company_id) {
             return new Response(JSON.stringify({ error: "Unauthorized: Cannot create users for other companies" }), {
