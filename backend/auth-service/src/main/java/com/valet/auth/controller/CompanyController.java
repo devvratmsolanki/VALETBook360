@@ -169,6 +169,16 @@ public class CompanyController {
         return service.setUserActive(principal(), id, req.active());
     }
 
+    /**
+     * PUT /api/users/{id} — edit a staff (valet/driver) member's name, role and
+     * location assignment. Admin any; manager own only.
+     */
+    @PutMapping("/users/{id}")
+    public AdminUserResponse updateUser(@PathVariable("id") UUID id,
+            @Valid @RequestBody com.valet.auth.dto.UpdateStaffRequest req) {
+        return service.updateStaff(principal(), id, req);
+    }
+
     /** DELETE /api/users/{id} — delete a staff (valet/driver) account. */
     @org.springframework.web.bind.annotation.DeleteMapping("/users/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable("id") UUID id) {

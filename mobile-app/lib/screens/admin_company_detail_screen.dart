@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/admin_location.dart';
+import '../models/admin_user.dart';
 import '../state/company_detail_controller.dart';
 import '../state/providers.dart';
 import '../theme/v_breakpoints.dart';
@@ -251,6 +252,16 @@ class _PeopleTab extends ConsumerWidget {
           errorReader: () => notifier.createError,
         );
 
+    Future<void> edit(AdminUser u) => AdminStaffSheet.show(
+          context,
+          role: u.role,
+          locations: state.locations,
+          existing: u,
+          onSubmit: notifier.addStaff,
+          onUpdate: (input) => notifier.updateStaff(u.id, input),
+          errorReader: () => notifier.createError,
+        );
+
     if (people.isEmpty) {
       return _EmptyTab(
         icon: isDriver
@@ -283,6 +294,12 @@ class _PeopleTab extends ConsumerWidget {
                 badge: u.active ? 'Active' : 'Inactive',
                 badgeColor:
                     u.active ? VColors.alertSuccess : VColors.contentFaint,
+                trailing: IconButton(
+                  tooltip: 'Edit',
+                  icon: Icon(Icons.edit_outlined,
+                      size: 20, color: VColors.contentMuted),
+                  onPressed: () => edit(u),
+                ),
               );
             },
           ),

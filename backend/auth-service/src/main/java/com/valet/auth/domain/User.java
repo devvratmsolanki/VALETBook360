@@ -110,12 +110,20 @@ public class User {
         return role;
     }
 
+    public void setRole(Role role) {
+        this.role = role;
+    }
+
     public UUID getCompanyId() {
         return companyId;
     }
 
     public UUID getLocationId() {
         return locationId;
+    }
+
+    public void setLocationId(UUID locationId) {
+        this.locationId = locationId;
     }
 
     public String getName() {

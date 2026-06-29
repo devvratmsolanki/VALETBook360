@@ -11,12 +11,19 @@ import '../widgets/v_primary_button.dart';
 import '../widgets/v_states.dart';
 
 typedef StaffSubmit = Future<bool> Function(CreateStaffInput input);
+typedef StaffUpdate = Future<bool> Function(UpdateStaffInput input);
 typedef ErrorReader = String? Function();
 
-/// Add operator / driver sheet — re-platforms the Operators & Drivers tabs of
-/// `CompanyDetail.jsx`, which both call create-staff and link the auth login.
-/// `role` is fixed by the caller to `valet` (operator) or `driver`; the backend
-/// rejects manager/admin. Location is an optional picker scoped to the company.
+/// Add / edit operator / driver sheet — re-platforms the Operators & Drivers
+/// tabs of `CompanyDetail.jsx`, which both call create-staff and link the auth
+/// login. `role` is fixed by the caller to `valet` (operator) or `driver`; the
+/// backend rejects manager/admin. Location is an optional picker scoped to the
+/// company.
+///
+/// When [existing] is non-null the sheet is in EDIT mode: name + location +
+/// role are prefilled, the email & password fields are hidden (email is the
+/// login identity and not editable), and submit calls [onUpdate] instead of
+/// [onSubmit].
 class AdminStaffSheet extends ConsumerStatefulWidget {
   const AdminStaffSheet({
     super.key,
@@ -24,6 +31,8 @@ class AdminStaffSheet extends ConsumerStatefulWidget {
     required this.locations,
     required this.onSubmit,
     required this.errorReader,
+    this.existing,
+    this.onUpdate,
   });
 
   /// `valet` | `driver`.
@@ -32,12 +41,20 @@ class AdminStaffSheet extends ConsumerStatefulWidget {
   final StaffSubmit onSubmit;
   final ErrorReader errorReader;
 
+  /// When set, the sheet edits this user instead of creating a new one.
+  final AdminUser? existing;
+
+  /// Required when [existing] is set; called with the edited values.
+  final StaffUpdate? onUpdate;
+
   static Future<bool?> show(
     BuildContext context, {
     required String role,
     required List<AdminLocation> locations,
     required StaffSubmit onSubmit,
     required ErrorReader errorReader,
+    AdminUser? existing,
+    StaffUpdate? onUpdate,
   }) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -48,6 +65,8 @@ class AdminStaffSheet extends ConsumerStatefulWidget {
         locations: locations,
         onSubmit: onSubmit,
         errorReader: errorReader,
+        existing: existing,
+        onUpdate: onUpdate,
       ),
     );
   }
@@ -67,7 +86,21 @@ class _AdminStaffSheetState extends ConsumerState<AdminStaffSheet> {
   String? _error;
 
   bool get _isDriver => widget.role == 'driver';
+  bool get _isEdit => widget.existing != null;
   String get _roleNoun => _isDriver ? 'driver' : 'operator';
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    if (existing != null) {
+      _name.text = existing.name ?? '';
+      // Only adopt the prefilled location if it still exists in the picker.
+      final hasLoc =
+          widget.locations.any((l) => l.id == existing.locationId);
+      _locationId = hasLoc ? existing.locationId : null;
+    }
+  }
 
   @override
   void dispose() {
@@ -85,14 +118,24 @@ class _AdminStaffSheetState extends ConsumerState<AdminStaffSheet> {
       _error = null;
     });
 
-    final input = CreateStaffInput(
-      email: _email.text,
-      password: _password.text,
-      name: _name.text,
-      role: widget.role,
-      locationId: _locationId,
-    );
-    final ok = await widget.onSubmit(input);
+    final bool ok;
+    if (_isEdit) {
+      final input = UpdateStaffInput(
+        name: _name.text,
+        role: widget.role,
+        locationId: _locationId,
+      );
+      ok = await widget.onUpdate!(input);
+    } else {
+      final input = CreateStaffInput(
+        email: _email.text,
+        password: _password.text,
+        name: _name.text,
+        role: widget.role,
+        locationId: _locationId,
+      );
+      ok = await widget.onSubmit(input);
+    }
 
     if (!mounted) return;
     if (ok) {
@@ -116,10 +159,13 @@ class _AdminStaffSheetState extends ConsumerState<AdminStaffSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('New $_roleNoun',
+            Text(_isEdit ? 'Edit team member' : 'New $_roleNoun',
                 style: VType.title.copyWith(color: VColors.contentStrong)),
             const SizedBox(height: VSpace.x1),
-            Text('Creates a login for this $_roleNoun in the company.',
+            Text(
+                _isEdit
+                    ? 'Update this $_roleNoun\'s details.'
+                    : 'Creates a login for this $_roleNoun in the company.',
                 style: VType.caption),
             const SizedBox(height: VSpace.x5),
             if (_error != null) ...[
@@ -135,31 +181,33 @@ class _AdminStaffSheetState extends ConsumerState<AdminStaffSheet> {
               validator: (v) =>
                   (v ?? '').trim().isEmpty ? 'Name is required' : null,
             ),
-            AdminFormField(
-              controller: _email,
-              label: 'Email',
-              hint: '$_roleNoun@company.com',
-              enabled: !_busy,
-              keyboardType: TextInputType.emailAddress,
-              validator: validateEmail,
-            ),
-            AdminFormField(
-              controller: _password,
-              label: 'Password',
-              hint: 'Min 8 chars, 1 letter + 1 number',
-              enabled: !_busy,
-              obscureText: _obscure,
-              validator: validatePassword,
-              suffix: IconButton(
-                icon: Icon(
-                  _obscure
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                  color: VColors.contentMuted,
-                ),
-                onPressed: () => setState(() => _obscure = !_obscure),
+            if (!_isEdit) ...[
+              AdminFormField(
+                controller: _email,
+                label: 'Email',
+                hint: '$_roleNoun@company.com',
+                enabled: !_busy,
+                keyboardType: TextInputType.emailAddress,
+                validator: validateEmail,
               ),
-            ),
+              AdminFormField(
+                controller: _password,
+                label: 'Password',
+                hint: 'Min 8 chars, 1 letter + 1 number',
+                enabled: !_busy,
+                obscureText: _obscure,
+                validator: validatePassword,
+                suffix: IconButton(
+                  icon: Icon(
+                    _obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    color: VColors.contentMuted,
+                  ),
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                ),
+              ),
+            ],
             if (widget.locations.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.only(left: VSpace.x1, bottom: VSpace.x2),
@@ -175,7 +223,7 @@ class _AdminStaffSheetState extends ConsumerState<AdminStaffSheet> {
             ],
             const SizedBox(height: VSpace.x4),
             VPrimaryButton(
-              label: 'Add $_roleNoun',
+              label: _isEdit ? 'Save' : 'Add $_roleNoun',
               icon: _isDriver
                   ? Icons.person_pin_circle_rounded
                   : Icons.badge_rounded,

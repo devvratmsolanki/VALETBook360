@@ -6,6 +6,7 @@ import com.valet.transaction.dto.CreateTransactionRequest;
 import com.valet.transaction.exception.ServiceException;
 import com.valet.transaction.realtime.RealtimeEventPublisher;
 import com.valet.transaction.repository.ValetTransactionRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -190,7 +191,18 @@ public class TransactionService {
         tx.setKeyCode(req.keyCode());
         tx.setStatus(ValetStatus.WAITING_FOR_DRIVER);
 
-        ValetTransaction saved = repository.save(tx);
+        final ValetTransaction saved;
+        try {
+            // saveAndFlush so a key-slot collision surfaces here (as 23505 →
+            // DataIntegrityViolationException) instead of at commit, letting us
+            // return a precise SLOT_TAKEN the operator panel can recover from.
+            saved = repository.saveAndFlush(tx);
+        } catch (DataIntegrityViolationException e) {
+            // ux_active_keycode_per_location: another active car at this location
+            // already holds this key slot (a concurrent operator grabbed it).
+            throw ServiceException.conflict("SLOT_TAKEN",
+                    "That key slot was just taken. Pick another free slot and try again.");
+        }
         realtime.emitCreated(saved);
         return saved;
     }

@@ -270,6 +270,41 @@ public class CompanyAdminService {
     }
 
     /**
+     * The effective key-slot pool for the CALLER'S OWN location (from the JWT),
+     * for the operator panel. Operators (valet) can't reach the admin/manager
+     * slot endpoints, so this is the single read-only projection they get,
+     * scoped to their own location — no cross-tenant exposure. Returns the custom
+     * slot names (ordered) if the company set them up, otherwise the generated
+     * sequence "1".."keyCapacity".
+     */
+    @Transactional(readOnly = true)
+    public com.valet.auth.dto.OperatorKeySlotsResponse operatorKeySlots(AuthPrincipal caller) {
+        UUID locationId = caller.locationId();
+        if (locationId == null) {
+            throw ServiceException.badRequest("NO_LOCATION",
+                    "Your account isn't assigned to a location, so no key slots are available.");
+        }
+        Location loc = locations.findById(locationId)
+                .orElseThrow(() -> ServiceException.notFound("LOCATION_NOT_FOUND",
+                        "Your assigned location could not be found."));
+        List<com.valet.auth.domain.KeySlot> custom =
+                keySlots.findByLocationIdOrderBySortOrderAscSlotNameAsc(locationId);
+        List<String> names;
+        if (!custom.isEmpty()) {
+            names = custom.stream()
+                    .map(com.valet.auth.domain.KeySlot::getSlotName)
+                    .toList();
+        } else {
+            int cap = Math.max(0, loc.getKeyCapacity());
+            names = java.util.stream.IntStream.rangeClosed(1, cap)
+                    .mapToObj(Integer::toString)
+                    .toList();
+        }
+        return new com.valet.auth.dto.OperatorKeySlotsResponse(
+                locationId, loc.getKeyCapacity(), names);
+    }
+
+    /**
      * Bulk-generate slots named {@code <prefix><startFrom + i>} for i in
      * [0, count). Mirrors the legacy generator: count is clamped to [0, 500];
      * each slot's {@code sortOrder} is {@code startFrom + i} so display order
@@ -531,6 +566,42 @@ public class CompanyAdminService {
         );
         staff = users.save(staff);
         return AdminUserResponse.from(staff);
+    }
+
+    /**
+     * Edit a staff member's name, role (valet|driver) and location assignment.
+     * Authorized identically to {@link #setUserActive}/{@link #deleteUser}: the
+     * target must be a valet/driver in a company the caller manages (admin → any;
+     * manager → own only). A supplied {@code locationId} must belong to that same
+     * company; {@code null} unassigns. Email/password are not editable here.
+     */
+    @Transactional
+    public AdminUserResponse updateStaff(AuthPrincipal caller, UUID userId,
+                                         com.valet.auth.dto.UpdateStaffRequest req) {
+        User u = loadStaffUserAuthorized(caller, userId);
+
+        Role role = req.role();
+        if (role != Role.VALET && role != Role.DRIVER) {
+            throw ServiceException.badRequest("INVALID_STAFF_ROLE",
+                    "Staff role must be 'valet' (operator) or 'driver'.");
+        }
+
+        // A (re)assigned location must belong to THIS user's company.
+        if (req.locationId() != null) {
+            Location loc = locations.findById(req.locationId())
+                    .orElseThrow(() -> ServiceException.badRequest("LOCATION_NOT_FOUND",
+                            "That location could not be found."));
+            if (!Objects.equals(loc.getCompanyId(), u.getCompanyId())) {
+                throw ServiceException.forbidden("CROSS_TENANT",
+                        "That location belongs to another company.");
+            }
+        }
+
+        u.setName(req.name().trim());
+        u.setRole(role);
+        u.setLocationId(req.locationId());
+        users.save(u);
+        return AdminUserResponse.from(u);
     }
 
     /**

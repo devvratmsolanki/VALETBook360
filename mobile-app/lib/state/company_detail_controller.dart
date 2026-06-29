@@ -168,6 +168,24 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
     }
   }
 
+  /// Edit a staff member (`valet` operator or `driver`). The role may flip
+  /// between valet/driver, so refresh both people slices. Returns true on
+  /// success; false + [createError] on failure.
+  Future<bool> updateStaff(String userId, UpdateStaffInput input) async {
+    createError = null;
+    try {
+      await _client.updateStaff(userId, input);
+      await Future.wait([_refreshOperators(), _refreshDrivers()]);
+      return true;
+    } on ApiException catch (e) {
+      createError = e.message;
+      return false;
+    } catch (_) {
+      createError = 'Could not save the staff member. Please try again.';
+      return false;
+    }
+  }
+
   /// Activate/deactivate a staff (operator/driver) account and refresh both
   /// people slices (the user could be in either). Returns true on success.
   Future<bool> setUserActive(String userId, bool active, {required bool isDriver}) async {

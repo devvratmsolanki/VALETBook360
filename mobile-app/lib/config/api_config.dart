@@ -84,6 +84,10 @@ class ApiConfig {
 
   // ---- Operator (valet/manager/admin) endpoints, base CORE ----
   static const String operatorTransactionsPath = '/api/operator/transactions';
+
+  /// Effective key-slot pool for the operator's own location (AUTH service,
+  /// authed). Returns `{ locationId, keyCapacity, slots }`.
+  static const String operatorKeySlotsPath = '/key-slots';
   /// Company-wide transaction history (all statuses) for the company panel.
   static const String operatorHistoryPath =
       '/api/operator/transactions/history';

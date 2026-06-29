@@ -490,6 +490,16 @@ class _PeopleList extends ConsumerWidget {
           errorReader: () => notifier.createError,
         );
 
+    Future<void> edit(AdminUser u) => AdminStaffSheet.show(
+          context,
+          role: u.role,
+          locations: state.locations,
+          existing: u,
+          onSubmit: notifier.addStaff,
+          onUpdate: (input) => notifier.updateStaff(u.id, input),
+          errorReader: () => notifier.createError,
+        );
+
     if (state.status == DetailStatus.loading) return _loading();
     if (state.status == DetailStatus.error) {
       return _error('Could not load $noun list.', notifier.load);
@@ -536,6 +546,7 @@ class _PeopleList extends ConsumerWidget {
         separatorBuilder: (_, __) => const SizedBox(height: VSpace.x2),
         itemBuilder: (_, i) => _PersonRow(
           user: people[i],
+          onEdit: () => edit(people[i]),
           onToggle: () => toggle(people[i]),
           onDelete: () => remove(people[i]),
         ),
@@ -578,8 +589,12 @@ Future<bool?> _confirm(BuildContext context, String title, String body) {
 
 class _PersonRow extends StatelessWidget {
   const _PersonRow(
-      {required this.user, required this.onToggle, required this.onDelete});
+      {required this.user,
+      required this.onEdit,
+      required this.onToggle,
+      required this.onDelete});
   final AdminUser user;
+  final VoidCallback onEdit;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
 
@@ -632,8 +647,17 @@ class _PersonRow extends StatelessWidget {
             color: VColors.surface800,
             icon: Icon(Icons.more_vert_rounded,
                 color: VColors.contentMuted, size: 20),
-            onSelected: (v) => v == 'toggle' ? onToggle() : onDelete(),
+            onSelected: (v) => switch (v) {
+              'edit' => onEdit(),
+              'toggle' => onToggle(),
+              _ => onDelete(),
+            },
             itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'edit',
+                child: Text('Edit',
+                    style: VType.body.copyWith(color: VColors.contentStrong)),
+              ),
               PopupMenuItem(
                 value: 'toggle',
                 child: Text(user.active ? 'Deactivate' : 'Activate',

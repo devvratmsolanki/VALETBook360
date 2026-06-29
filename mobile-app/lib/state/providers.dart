@@ -4,6 +4,7 @@ import '../api/realtime_client.dart';
 import '../api/token_store.dart';
 import '../models/contract.dart';
 import '../models/key_slot.dart';
+import '../models/operator_key_slots.dart';
 import '../models/transaction.dart';
 import 'admin_locations_controller.dart';
 import 'admin_users_controller.dart';
@@ -103,6 +104,15 @@ final floorControllerProvider =
     client: ref.watch(apiClientProvider),
     realtime: ref.watch(realtimeClientProvider),
   );
+});
+
+/// Effective key-slot pool for the operator's own location, powering the
+/// "New car" key-slot grid picker. `ref.invalidate(operatorKeySlotsProvider)`
+/// re-pulls (rarely needed — the pool is static; occupancy is computed live
+/// from [floorControllerProvider]). autoDispose so it refetches per sheet open.
+final operatorKeySlotsProvider =
+    FutureProvider.autoDispose<OperatorKeySlots>((ref) async {
+  return ref.watch(apiClientProvider).fetchOperatorKeySlots();
 });
 
 /// Company-scoped driver directory for the operator's assign-driver picker.

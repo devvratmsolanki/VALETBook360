@@ -93,3 +93,27 @@ class CreateStaffInput {
           'locationId': locationId,
       };
 }
+
+/// Body for `PUT /api/users/{id}`. `role` MUST be `valet` (operator) or
+/// `driver`; the backend rejects manager/admin. Email/password are not editable
+/// here — email is the login identity. `locationId` may be null (Unassigned).
+class UpdateStaffInput {
+  const UpdateStaffInput({
+    required this.name,
+    required this.role,
+    this.locationId,
+  });
+
+  final String name;
+
+  /// `valet` | `driver`.
+  final String role;
+  final String? locationId;
+
+  Map<String, dynamic> toJson() => {
+        'name': name.trim(),
+        'role': role,
+        'locationId':
+            (locationId != null && locationId!.isNotEmpty) ? locationId : null,
+      };
+}

@@ -9,6 +9,7 @@ import '../models/contract.dart';
 import '../models/driver.dart';
 import '../models/key_slot.dart';
 import '../models/lifecycle_status.dart';
+import '../models/operator_key_slots.dart';
 import '../models/transaction.dart';
 import 'api_exception.dart';
 import 'token_store.dart';
@@ -97,6 +98,24 @@ class ApiClient {
           .whereType<Map<String, dynamic>>()
           .map(Driver.fromJson)
           .toList(growable: false);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// GET /key-slots (AUTH, authed) → the effective key-slot pool for the
+  /// operator's own location as `{ locationId, keyCapacity, slots }`. Location
+  /// scope is server-derived from the JWT. `slots` is the ordered pool (custom
+  /// names if set, else "1".."keyCapacity") and may be empty.
+  Future<OperatorKeySlots> fetchOperatorKeySlots() async {
+    try {
+      final res = await _auth.get(ApiConfig.operatorKeySlotsPath);
+      _ensureOk(res);
+      final data = res.data;
+      if (data is! Map<String, dynamic>) {
+        throw ApiException(message: 'Unexpected response from the server.');
+      }
+      return OperatorKeySlots.fromJson(data);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }
@@ -252,6 +271,25 @@ class ApiClient {
       final res = await _auth.put(
         ApiConfig.userActivePath(userId),
         data: {'active': active},
+      );
+      _ensureOk(res);
+      final data = res.data;
+      if (data is! Map<String, dynamic>) {
+        throw ApiException(message: 'Unexpected response from the server.');
+      }
+      return AdminUser.fromJson(data);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// PUT /api/users/{id} → edit a staff (valet/driver) account's name, role and
+  /// location. Returns the updated user.
+  Future<AdminUser> updateStaff(String userId, UpdateStaffInput input) async {
+    try {
+      final res = await _auth.put(
+        ApiConfig.userPath(userId),
+        data: input.toJson(),
       );
       _ensureOk(res);
       final data = res.data;
