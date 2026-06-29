@@ -1,6 +1,7 @@
 package com.valet.transaction.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -12,14 +13,24 @@ import jakarta.validation.constraints.Size;
  */
 public record CreateTransactionRequest(
         @NotBlank(message = "carPlate is required")
-        @Size(max = 32, message = "carPlate is too long")
+        @Pattern(regexp = "^[A-Za-z0-9]{2,15}$",
+                message = "carPlate must be 2-15 letters or digits")
         String carPlate,
 
         @Size(max = 64) String carMake,
         @Size(max = 64) String carModel,
         @Size(max = 32) String carColor,
-        @Size(max = 128) String guestName,
-        @Size(max = 32) String guestPhone,
+
+        // Optional, but length-bounded and free of markup/quote chars so a guest
+        // name/phone can't be used to smuggle HTML/SQL-ish payloads.
+        @Size(max = 100)
+        @Pattern(regexp = "^[^<>\"'&]{0,100}$", message = "guestName contains invalid characters")
+        String guestName,
+
+        @Size(max = 100)
+        @Pattern(regexp = "^[^<>\"'&]{0,100}$", message = "guestPhone contains invalid characters")
+        String guestPhone,
+
         @Size(max = 32) String keyCode
 ) {
 }

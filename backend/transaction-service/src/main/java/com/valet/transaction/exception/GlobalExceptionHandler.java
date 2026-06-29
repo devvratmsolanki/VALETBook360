@@ -55,6 +55,32 @@ public class GlobalExceptionHandler {
                 "The request was malformed.", null, req);
     }
 
+    /**
+     * Out-of-range request parameters (e.g. a page index whose offset exceeds
+     * {@code Integer.MAX_VALUE}) surface as {@link IllegalArgumentException}. That
+     * is a client error, so map it to 400 rather than the catch-all 500.
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ProblemDetail> handleIllegalArgument(IllegalArgumentException ex,
+                                                               HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                "One or more request parameters were out of range.", null, req);
+    }
+
+    /**
+     * Concurrent modification of the same transaction. JPA optimistic locking
+     * (the {@code @Version} column) raises this when two callers mutate the same
+     * row from the same prior version — e.g. two operators double-assigning, or a
+     * double-deliver. Surface a clean 409 so the client refreshes and retries
+     * instead of silently losing one update (last-write-wins).
+     */
+    @ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
+    public ResponseEntity<ProblemDetail> handleOptimisticLock(
+            org.springframework.dao.OptimisticLockingFailureException ex, HttpServletRequest req) {
+        return build(HttpStatus.CONFLICT, "CONCURRENT_UPDATE",
+                "This car was just updated by someone else — refresh and retry.", null, req);
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ProblemDetail> handleIntegrity(DataIntegrityViolationException ex,
                                                          HttpServletRequest req) {

@@ -370,8 +370,18 @@ public class TransactionService {
                     tx.setRequestedAt(now);
                 }
             }
-            case ARRIVED -> tx.setArrivedAt(now);
-            case DELIVERED -> tx.setDeliveredAt(now);
+            // Set-if-null (like REQUESTED): a duplicate/retried transition must
+            // not overwrite the true first-arrival / first-delivery timestamp.
+            case ARRIVED -> {
+                if (tx.getArrivedAt() == null) {
+                    tx.setArrivedAt(now);
+                }
+            }
+            case DELIVERED -> {
+                if (tx.getDeliveredAt() == null) {
+                    tx.setDeliveredAt(now);
+                }
+            }
             default -> {
                 // No timestamp column for the other states.
             }

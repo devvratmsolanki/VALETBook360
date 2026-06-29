@@ -65,6 +65,22 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Out-of-range request parameters reach the service as an
+     * {@link IllegalArgumentException} rather than a bean-validation failure — the
+     * canonical case being {@code GET /api/admin/users?page=2147483647}, where the
+     * resulting page offset exceeds {@code Integer.MAX_VALUE} and Spring Data
+     * raises {@code IllegalArgumentException} during query execution. That is a
+     * client error (bad input), so map it to 400 instead of letting it fall to
+     * the catch-all 500.
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ProblemDetail> handleIllegalArgument(IllegalArgumentException ex,
+                                                               HttpServletRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                "One or more request parameters were out of range.", null, req);
+    }
+
+    /**
      * Spring throws this when a route exists but the HTTP method is wrong (e.g.
      * {@code GET} on a POST-only endpoint). Without this handler it falls through
      * to the catch-all 500, which is wrong — wrong-method is a client error, not

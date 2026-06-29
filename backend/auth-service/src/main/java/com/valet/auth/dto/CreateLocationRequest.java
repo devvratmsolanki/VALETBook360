@@ -1,5 +1,6 @@
 package com.valet.auth.dto;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
@@ -25,7 +26,9 @@ public record CreateLocationRequest(
         @Size(max = 120)
         String country,
 
-        @PositiveOrZero
+        // Upper-bounded so a caller can never request billions of generated
+        // numeric key slots (operatorKeySlots streams 1..keyCapacity) → OOM.
+        @PositiveOrZero @Max(10_000)
         int keyCapacity
 ) {
 }

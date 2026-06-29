@@ -7,6 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -76,6 +77,16 @@ public class ValetTransaction {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /**
+     * Optimistic-lock version. JPA increments this on every UPDATE and fails the
+     * write with an {@code OptimisticLockingFailureException} if the row's version
+     * changed underneath us — preventing double-deliver / double-assign
+     * last-write-wins when two callers act on the same car concurrently.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private int version;
 
     public ValetTransaction() {
         // JPA + builders in callers/tests
@@ -242,5 +253,9 @@ public class ValetTransaction {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public int getVersion() {
+        return version;
     }
 }

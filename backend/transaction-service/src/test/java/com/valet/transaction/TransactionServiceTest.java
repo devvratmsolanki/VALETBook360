@@ -102,6 +102,32 @@ class TransactionServiceTest {
     }
 
     @Test
+    void arrivedDoesNotOverwriteAnExistingArrivedAt() {
+        UUID id = UUID.randomUUID();
+        ValetTransaction t = tx(id, ValetStatus.EN_ROUTE, DRIVER);
+        java.time.Instant firstArrival = java.time.Instant.parse("2026-01-01T00:00:00Z");
+        t.setArrivedAt(firstArrival); // stale/duplicate-transition guard
+        when(repository.findById(id)).thenReturn(Optional.of(t));
+
+        ValetTransaction result = service.driverArrived(id, DRIVER);
+
+        assertThat(result.getArrivedAt()).isEqualTo(firstArrival);
+    }
+
+    @Test
+    void deliveredDoesNotOverwriteAnExistingDeliveredAt() {
+        UUID id = UUID.randomUUID();
+        ValetTransaction t = tx(id, ValetStatus.ARRIVED, DRIVER);
+        java.time.Instant firstDelivery = java.time.Instant.parse("2026-01-01T00:00:00Z");
+        t.setDeliveredAt(firstDelivery);
+        when(repository.findById(id)).thenReturn(Optional.of(t));
+
+        ValetTransaction result = service.driverDelivered(id, DRIVER);
+
+        assertThat(result.getDeliveredAt()).isEqualTo(firstDelivery);
+    }
+
+    @Test
     void illegalTransitionThrows409AndDoesNotSave() {
         UUID id = UUID.randomUUID();
         // arrived -> en_route is backwards / illegal

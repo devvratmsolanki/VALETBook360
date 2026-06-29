@@ -70,6 +70,17 @@ public class CompanyAdminService {
     /** Upper bound on a single bulk key-slot generation (legacy MAX_BULK_SLOTS). */
     private static final int MAX_BULK_SLOTS = 500;
 
+    /**
+     * Hard ceiling on a location's key capacity. Mirrors {@code @Max(10_000)} on
+     * the create/update DTOs, but re-enforced here so a pre-existing oversized
+     * row (persisted before that bound existed) can't make
+     * {@link #operatorKeySlots} stream billions of slot strings → OOM.
+     */
+    private static final int MAX_KEY_CAPACITY = 10_000;
+
+    /** Hard ceiling on a bulk slot starting sequence (mirrors the DTO's @Max). */
+    private static final int MAX_SLOT_START = 1_000_000;
+
     public CompanyAdminService(CompanyRepository companies, LocationRepository locations,
                                UserRepository users,
                                com.valet.auth.repository.KeySlotRepository keySlots,
@@ -303,7 +314,10 @@ public class CompanyAdminService {
                     .map(com.valet.auth.domain.KeySlot::getSlotName)
                     .toList();
         } else {
-            int cap = Math.max(0, loc.getKeyCapacity());
+            // Clamp BEFORE the IntStream: a row whose key_capacity predates the
+            // @Max(10_000) DTO bound (or was set via some other path) must not be
+            // able to allocate billions of strings here and OOM the service.
+            int cap = Math.min(MAX_KEY_CAPACITY, Math.max(0, loc.getKeyCapacity()));
             names = java.util.stream.IntStream.rangeClosed(1, cap)
                     .mapToObj(Integer::toString)
                     .toList();
@@ -324,12 +338,31 @@ public class CompanyAdminService {
             com.valet.auth.dto.BulkGenerateSlotsRequest req) {
         authorizeLocation(caller, locationId);
 
+        // Bulletproof bounds re-enforced at the service layer (the DTO @Min/@Max
+        // already guard the validated path; this also protects any non-validated
+        // caller and a hostile body that somehow slips a larger value through).
         int count = Math.max(0, Math.min(MAX_BULK_SLOTS, req.count()));
         if (count == 0) {
             return List.of();
         }
         String prefix = req.prefix() == null ? "" : req.prefix().trim();
-        int start = Math.max(0, req.startFrom());
+        int start = Math.min(MAX_SLOT_START, Math.max(0, req.startFrom()));
+
+        // Reject up-front if any generated name collides with an existing slot at
+        // this location (the ux_slot_name_per_location unique constraint would
+        // otherwise surface as a generic 409 CONFLICT). Batch names are unique by
+        // construction (seq strictly increments), so only existing rows can clash.
+        List<String> names = new java.util.ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            names.add(prefix + (start + i));
+        }
+        List<String> taken = keySlots.findByLocationIdAndSlotNameIn(locationId, names)
+                .stream().map(com.valet.auth.domain.KeySlot::getSlotName).toList();
+        if (!taken.isEmpty()) {
+            throw ServiceException.conflict("SLOT_NAME_TAKEN",
+                    "One or more of those slot names already exist at this location: "
+                            + String.join(", ", taken) + ".");
+        }
 
         List<com.valet.auth.domain.KeySlot> toSave = new java.util.ArrayList<>(count);
         for (int i = 0; i < count; i++) {
@@ -346,7 +379,15 @@ public class CompanyAdminService {
     public com.valet.auth.dto.KeySlotResponse renameSlot(AuthPrincipal caller, UUID slotId,
                                                          String slotName) {
         com.valet.auth.domain.KeySlot slot = loadSlotAuthorized(caller, slotId);
-        slot.setSlotName(slotName.trim());
+        String trimmed = slotName.trim();
+        // Reject a clash with another slot at the same location before the
+        // ux_slot_name_per_location unique constraint turns it into a generic 409.
+        if (keySlots.existsByLocationIdAndSlotNameAndIdNot(
+                slot.getLocationId(), trimmed, slot.getId())) {
+            throw ServiceException.conflict("SLOT_NAME_TAKEN",
+                    "Another slot at this location already uses the name '" + trimmed + "'.");
+        }
+        slot.setSlotName(trimmed);
         keySlots.save(slot);
         return com.valet.auth.dto.KeySlotResponse.from(slot);
     }
