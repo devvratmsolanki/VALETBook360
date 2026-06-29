@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:valet_driver_app/api/api_client.dart';
+import 'package:valet_driver_app/api/api_exception.dart';
 import 'package:valet_driver_app/api/realtime_client.dart';
 import 'package:valet_driver_app/api/token_store.dart';
 import 'package:valet_driver_app/models/lifecycle_status.dart';
@@ -21,11 +22,16 @@ class _FakeApiClient extends ApiClient {
   _FakeApiClient({
     required this.transactions,
     this.onAction,
+    this.throwOnAction = false,
   }) : super(_FakeTokenStore());
 
   List<Transaction> transactions;
   final void Function(String id, OperatorAction action, String? driverId)?
       onAction;
+
+  /// When true, [operatorAction] fails after invoking [onAction] — used to
+  /// drive the optimistic-rollback path.
+  final bool throwOnAction;
 
   int fetchCalls = 0;
 
@@ -51,6 +57,12 @@ class _FakeApiClient extends ApiClient {
     String? driverId,
   }) async {
     onAction?.call(txId, action, driverId);
+    // Let any realtime delta emitted by onAction be delivered to the controller
+    // before we (optionally) fail, so the in-flight window is exercised.
+    await Future<void>.delayed(Duration.zero);
+    if (throwOnAction) {
+      throw ApiException(message: 'Action failed');
+    }
   }
 }
 
@@ -144,6 +156,53 @@ void main() {
 
       expect(controller.state.transactions.first.status,
           LifecycleStatus.keyIn);
+    });
+
+    test(
+        'a realtime delta during an in-flight action wins over the failure '
+        'rollback (BUG-15)', () async {
+      final realtime = RealtimeClient(baseUrl: 'http://localhost:0');
+      final client = _FakeApiClient(
+        transactions: [_tx('a', LifecycleStatus.parked)],
+        throwOnAction: true,
+        // While the action is in flight, the gateway reports the authoritative
+        // server state for the same card.
+        onAction: (_, __, ___) =>
+            realtime.debugEmit('tx:status', {'id': 'a', 'status': 'requested'}),
+      );
+      final controller = FloorController(client: client, realtime: realtime);
+      addTearDown(controller.dispose);
+      addTearDown(realtime.dispose);
+      await Future<void>.delayed(Duration.zero);
+
+      final tx = controller.state.transactions.first; // parked
+      final ok = await controller.act(tx, OperatorAction.keyIn);
+
+      expect(ok, isFalse, reason: 'the action failed');
+      // Rollback would have restored `parked`; instead the realtime `requested`
+      // is kept because it is authoritative.
+      expect(controller.state.transactions.first.status,
+          LifecycleStatus.requested);
+      expect(controller.state.busyId, isNull);
+    });
+
+    test('a plain action failure (no realtime) still rolls back', () async {
+      final realtime = RealtimeClient(baseUrl: 'http://localhost:0');
+      final client = _FakeApiClient(
+        transactions: [_tx('a', LifecycleStatus.parked)],
+        throwOnAction: true,
+      );
+      final controller = FloorController(client: client, realtime: realtime);
+      addTearDown(controller.dispose);
+      addTearDown(realtime.dispose);
+      await Future<void>.delayed(Duration.zero);
+
+      final tx = controller.state.transactions.first;
+      final ok = await controller.act(tx, OperatorAction.keyIn);
+
+      expect(ok, isFalse);
+      expect(controller.state.transactions.first.status,
+          LifecycleStatus.parked); // rolled back
     });
 
     test('tx:status for an unknown id triggers a reconciling refetch',

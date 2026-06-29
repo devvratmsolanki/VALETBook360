@@ -14,9 +14,13 @@ import '../models/transaction.dart';
 import 'api_exception.dart';
 import 'token_store.dart';
 
-/// Signalled when a 401 is seen on an authed call so the app can bounce to
-/// login (doc: "401 → bounce to login").
+/// Signalled when a 401 is seen on an authed call AND the token could not be
+/// refreshed, so the app can bounce to login (doc: "401 → bounce to login").
 typedef UnauthorizedHandler = void Function();
+
+/// Signalled after a successful silent token refresh, carrying the fresh access
+/// token so dependents (e.g. the realtime socket) can re-authenticate.
+typedef TokenRefreshedHandler = void Function(String accessToken);
 
 /// Typed client over the two backends. Handles bearer injection, 401 bounce,
 /// and problem+json parsing. AUTH and CORE get separate dio instances so they
@@ -29,14 +33,31 @@ class ApiClient {
     // AUTH also carries the bearer for authed reads (e.g. the driver picker).
     // login/refresh simply have no token yet, so the header is omitted there.
     _auth.interceptors.add(_bearerInterceptor());
+    // 401 auto-refresh + retry. Added AFTER the bearer interceptor so the retry
+    // (which re-runs the pipeline) picks up the freshly-saved access token.
+    _core.interceptors.add(_refreshInterceptor(_core));
+    _auth.interceptors.add(_refreshInterceptor(_auth));
   }
 
   final TokenStore _tokens;
   final Dio _auth;
   final Dio _core;
 
-  /// Set by the app shell; invoked on any 401 from an authed (CORE) call.
+  /// Set by the app shell; invoked on a 401 only after a refresh attempt has
+  /// itself failed (or there was no refresh token) — i.e. a truly dead session.
   UnauthorizedHandler? onUnauthorized;
+
+  /// Set by the app shell; invoked with the new access token after a successful
+  /// silent refresh so the realtime socket can re-auth on the fresh credential.
+  TokenRefreshedHandler? onTokenRefreshed;
+
+  /// Single-flight guard: while a refresh is in progress this holds the shared
+  /// future so a burst of concurrent 401s triggers exactly one /auth/refresh.
+  Future<bool>? _refreshing;
+
+  /// Marks a request that has already been retried once post-refresh, so a
+  /// second 401 can't loop back into another refresh+retry.
+  static const _retriedFlag = '__valet_retried__';
 
   static Dio _build(String baseUrl) {
     return Dio(
@@ -65,6 +86,90 @@ class ApiClient {
     );
   }
 
+  /// On a 401 for an authed call, transparently refresh the token once and
+  /// replay the request. login/refresh are exempt (a 401 there is a real auth
+  /// failure, not an expiry), and a request that's already been retried is
+  /// exempt — together these break the 401 → refresh → 401 loop. Concurrent
+  /// 401s share one in-flight refresh (single-flight). Because dio's
+  /// validateStatus accepts <500, a 401 arrives as a normal response, so this
+  /// runs in onResponse rather than onError.
+  Interceptor _refreshInterceptor(Dio dio) {
+    return InterceptorsWrapper(
+      onResponse: (response, handler) async {
+        final req = response.requestOptions;
+        final isRetryable = response.statusCode == 401 &&
+            !_isAuthEntryPath(req.path) &&
+            req.extra[_retriedFlag] != true;
+        if (!isRetryable) {
+          handler.next(response);
+          return;
+        }
+
+        final refreshed = await _refreshOnce();
+        if (!refreshed) {
+          // The refresh itself failed (or no refresh token): the session is
+          // dead — bounce to login and let the 401 surface as usual.
+          onUnauthorized?.call();
+          handler.next(response);
+          return;
+        }
+
+        // Replay the original request once with the refreshed token (the bearer
+        // interceptor re-reads the now-saved access token on this re-run).
+        req.extra[_retriedFlag] = true;
+        try {
+          final retried = await dio.fetch(req);
+          handler.resolve(retried);
+        } on DioException catch (e) {
+          if (e.response != null) {
+            handler.resolve(e.response!);
+          } else {
+            handler.reject(e);
+          }
+        }
+      },
+    );
+  }
+
+  /// True for the unauthenticated auth entry points (login/refresh), where a 401
+  /// must NOT trigger a refresh attempt.
+  static bool _isAuthEntryPath(String path) =>
+      path.contains(ApiConfig.loginPath) ||
+      path.contains(ApiConfig.refreshPath);
+
+  /// Single-flight refresh: the first caller starts it; concurrent callers await
+  /// the same future. Resolves true if a fresh session was saved.
+  Future<bool> _refreshOnce() {
+    return _refreshing ??=
+        _performRefresh().whenComplete(() => _refreshing = null);
+  }
+
+  Future<bool> _performRefresh() async {
+    final refreshToken = await _tokens.refreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) return false;
+    try {
+      // Bare post (still on the AUTH dio, but the refresh path is exempt from
+      // this very interceptor, so it can't recurse). Send both key spellings to
+      // tolerate either backend naming.
+      final res = await _auth.post(
+        ApiConfig.refreshPath,
+        data: {'refreshToken': refreshToken, 'refresh_token': refreshToken},
+        options: Options(extra: {_retriedFlag: true}),
+      );
+      final code = res.statusCode ?? 0;
+      if (code < 200 || code >= 300) return false;
+      final data = res.data;
+      if (data is! Map<String, dynamic>) return false;
+      final session = AuthSession.fromJson(data);
+      if (session.accessToken.isEmpty) return false;
+      await _tokens.save(session);
+      onTokenRefreshed?.call(session.accessToken);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ---- AUTH ----
 
   /// POST /auth/login → 200 stores tokens+user, 401 throws unauthorized.
@@ -80,6 +185,24 @@ class ApiClient {
         throw ApiException(message: 'Unexpected response from the server.');
       }
       return AuthSession.fromJson(data);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// GET /auth/me (AUTH, authed) → the current [AuthUser]. Throws an
+  /// `isUnauthorized` [ApiException] on 401/403 (dead/invalid token). An expired
+  /// access token is transparently refreshed by the interceptor first; only a
+  /// dead refresh token reaches the caller as a 401.
+  Future<AuthUser> me() async {
+    try {
+      final res = await _auth.get(ApiConfig.mePath);
+      _ensureOk(res);
+      final data = res.data;
+      if (data is! Map<String, dynamic>) {
+        throw ApiException(message: 'Unexpected response from the server.');
+      }
+      return AuthUser.fromJson(data);
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }
@@ -567,13 +690,14 @@ class ApiClient {
     }
   }
 
-  /// Throws (and triggers the 401 bounce) for non-2xx responses that slipped
-  /// past dio's validateStatus (since we accept <500).
+  /// Throws for non-2xx responses that slipped past dio's validateStatus (since
+  /// we accept <500). A 401 here means the refresh interceptor already tried (and
+  /// failed) to refresh and has fired [onUnauthorized] — so we only translate it
+  /// to a typed exception; the bounce is not re-triggered here.
   void _ensureOk(Response res) {
     final code = res.statusCode ?? 0;
     if (code >= 200 && code < 300) return;
     if (code == 401) {
-      onUnauthorized?.call();
       throw ApiException(
         message: ApiException.fromDioData(res.data) ??
             'Your session has expired. Please sign in again.',

@@ -40,6 +40,9 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 /// Socket.IO realtime gateway client (single instance for the app).
 final realtimeClientProvider = Provider<RealtimeClient>((ref) {
   final client = RealtimeClient();
+  // On auto-reconnect the socket re-reads the freshest token from the store so a
+  // token refreshed while it was down doesn't replay on a stale credential.
+  client.currentToken = () => ref.read(tokenStoreProvider).accessToken;
   ref.onDispose(client.dispose);
   return client;
 });
@@ -66,7 +69,16 @@ final authControllerProvider =
 final realtimeConnectorProvider = Provider<void>((ref) {
   final realtime = ref.watch(realtimeClientProvider);
   final tokens = ref.watch(tokenStoreProvider);
+  final api = ref.watch(apiClientProvider);
   final auth = ref.watch(authControllerProvider);
+
+  // BUG-13: when the HTTP client silently refreshes the access token, the auth
+  // STATUS doesn't change (still authenticated), so this provider wouldn't
+  // otherwise re-run. Reconnect the socket on the fresh token explicitly — the
+  // connect() equality guard sees a new token and rebuilds with it.
+  api.onTokenRefreshed = (token) {
+    if (auth.isAuthed && token.isNotEmpty) realtime.connect(token);
+  };
 
   if (auth.isAuthed) {
     // Pull the freshest token from secure storage and (re)connect.

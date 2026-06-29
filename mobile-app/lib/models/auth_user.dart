@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// The authenticated user returned by `POST /auth/login`.
 ///
 /// Contract shape (camelCase on the wire, per doc §10.7). Unknown/optional
@@ -22,11 +24,32 @@ class AuthUser {
   final String? companyId;
   final String? locationId;
 
+  /// The valid DB role vocabulary. A user whose role is missing or outside this
+  /// set is NOT silently treated as a driver — the auth layer rejects it.
+  static const Set<String> knownRoles = {'admin', 'manager', 'valet', 'driver'};
+
+  /// Whether [role] is one the router knows how to home. Callers (login /
+  /// session-restore) must reject a user for which this is false rather than
+  /// routing them to a default panel.
+  bool get hasKnownRole => knownRoles.contains(role);
+
   factory AuthUser.fromJson(Map<String, dynamic> json) {
+    // Do NOT default a missing/unknown role to 'driver' — that silently routes
+    // an unrecognised account to the driver panel. Keep the raw value (or '')
+    // and let the auth layer reject it via [hasKnownRole].
+    final rawRole = (json['role'] ?? '').toString();
+    if (!knownRoles.contains(rawRole)) {
+      if (kDebugMode) {
+        debugPrint(
+          '[AuthUser] unrecognised role "${json['role']}" for '
+          'user ${json['id'] ?? json['userId']} — refusing to default to driver.',
+        );
+      }
+    }
     return AuthUser(
       id: (json['id'] ?? json['userId'] ?? '').toString(),
       email: (json['email'] ?? '').toString(),
-      role: (json['role'] ?? 'driver').toString(),
+      role: rawRole,
       name: json['name']?.toString(),
       companyId: json['companyId']?.toString(),
       locationId: json['locationId']?.toString(),

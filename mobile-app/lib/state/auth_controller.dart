@@ -50,14 +50,52 @@ class AuthController extends StateNotifier<AuthState> {
   final ApiClient _client;
   final TokenStore _tokens;
 
-  /// On boot, restore a stored session so the user skips login.
+  /// On boot, restore a stored session so the user skips login — but VERIFY it
+  /// against the server first instead of trusting the cached token. We stay in
+  /// the initial `unknown` (loading) state during the check so the UI shows the
+  /// boot loading state rather than flashing an authed screen that then bounces.
+  ///
+  /// An expired access token is transparently refreshed by the client's
+  /// interceptor when we hit `/auth/me`; only a dead refresh token (401/403)
+  /// logs the user out. A transient network/5xx error is NOT a logout — we fall
+  /// back to the cached session so an offline boot still works.
   Future<void> _restore() async {
     final token = await _tokens.accessToken;
     final user = await _tokens.readUser();
-    if (token != null && token.isNotEmpty && user != null) {
-      state = AuthState(status: AuthStatus.authenticated, user: user);
-    } else {
+    if (token == null || token.isEmpty || user == null) {
       state = const AuthState(status: AuthStatus.unauthenticated);
+      return;
+    }
+
+    try {
+      final verified = await _client.me();
+      // BUG-14: never route an unknown/missing role — clear and force re-login.
+      if (!verified.hasKnownRole) {
+        await _tokens.clear();
+        state = const AuthState(
+          status: AuthStatus.unauthenticated,
+          error: 'Your account role is not recognised. Please sign in again.',
+        );
+        return;
+      }
+      // Server is the source of truth — adopt the freshly-fetched user.
+      state = AuthState(status: AuthStatus.authenticated, user: verified);
+    } on ApiException catch (e) {
+      if (e.isUnauthorized || e.statusCode == 401 || e.statusCode == 403) {
+        // Dead session (refresh already failed inside the interceptor).
+        await _tokens.clear();
+        state = const AuthState(status: AuthStatus.unauthenticated);
+      } else {
+        // Transient (network / 5xx): trust the cache so offline boot works,
+        // but only if the cached role is itself recognised (BUG-14).
+        state = user.hasKnownRole
+            ? AuthState(status: AuthStatus.authenticated, user: user)
+            : const AuthState(status: AuthStatus.unauthenticated);
+      }
+    } catch (_) {
+      state = user.hasKnownRole
+          ? AuthState(status: AuthStatus.authenticated, user: user)
+          : const AuthState(status: AuthStatus.unauthenticated);
     }
   }
 
@@ -68,6 +106,16 @@ class AuthController extends StateNotifier<AuthState> {
     );
     try {
       final session = await _client.login(email.trim(), password);
+      // BUG-14: a login that returns an unknown/missing role is an auth failure,
+      // not a driver — don't persist it or route into a default panel.
+      if (!session.user.hasKnownRole) {
+        await _tokens.clear();
+        state = const AuthState(
+          status: AuthStatus.unauthenticated,
+          error: 'Your account role is not recognised. Contact your admin.',
+        );
+        return false;
+      }
       await _tokens.save(session);
       state = AuthState(
         status: AuthStatus.authenticated,

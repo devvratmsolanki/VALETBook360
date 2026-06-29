@@ -62,6 +62,14 @@ class ApiConfig {
   // ---- Contract paths (fixed; shared with the backend agents) ----
   static const String loginPath = '/auth/login';
 
+  /// Exchanges a refresh token for a fresh access+refresh+user (same 200 shape
+  /// as [loginPath]). Driven by the 401 auto-refresh interceptor.
+  static const String refreshPath = '/auth/refresh';
+
+  /// Returns the current [AuthUser] for the bearer token; 401/403 if the token
+  /// is invalid or the account is inactive. Used to verify a restored session.
+  static const String mePath = '/auth/me';
+
   /// Tenant-scoped driver directory for the operator's assign picker. Served by
   /// the AUTH service (drivers are users) and authed with the operator's bearer
   /// token; the company scope is derived server-side from the JWT.

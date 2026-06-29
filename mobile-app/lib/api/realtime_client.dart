@@ -54,6 +54,11 @@ class RealtimeClient {
   io.Socket? _socket;
   String? _token;
 
+  /// Reads the current access token (wired to [TokenStore] by the app shell).
+  /// Used on auto-reconnect to pick up a token that was refreshed while the
+  /// socket was down, so the handshake never replays a stale credential.
+  Future<String?> Function()? currentToken;
+
   final _events = StreamController<RealtimeEvent>.broadcast();
   final _status = StreamController<RealtimeStatus>.broadcast();
   RealtimeStatus _current = RealtimeStatus.idle;
@@ -97,12 +102,28 @@ class RealtimeClient {
     socket.onConnectError((_) => _emitStatus(RealtimeStatus.disconnected));
     socket.onError((_) => _emitStatus(RealtimeStatus.disconnected));
     socket.onDisconnect((_) => _emitStatus(RealtimeStatus.disconnected));
+    // On an auto-reconnect (network blip / backoff), the token may have been
+    // refreshed under us. Re-read it and, if it changed, rebuild the connection
+    // on the NEW credential so the gateway never re-auths on a stale token.
+    socket.onReconnect((_) => _reauthOnReconnect());
 
     for (final name in _eventNames) {
       socket.on(name, (data) => _forward(name, data));
     }
 
     socket.connect();
+  }
+
+  /// Re-auth the socket against the freshest stored token after an auto-reconnect.
+  Future<void> _reauthOnReconnect() async {
+    final read = currentToken;
+    if (read == null) return;
+    final fresh = await read();
+    if (fresh == null || fresh.isEmpty) return;
+    if (fresh != _token) {
+      // Token rotated while we were down — tear down and reconnect with it.
+      connect(fresh);
+    }
   }
 
   /// Test seam: push a synthetic delta through the events stream without a live

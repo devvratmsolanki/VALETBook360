@@ -72,6 +72,12 @@ class FloorController extends StateNotifier<FloorState> {
   StreamSubscription<RealtimeStatus>? _statusSub;
   Timer? _pollTimer;
 
+  /// BUG-15: set when a realtime delta lands for the in-flight ([busyId]) card
+  /// during an optimistic action. If the action's HTTP call then fails, we must
+  /// NOT roll back — the realtime event already carried authoritative server
+  /// state and rolling back would clobber it.
+  bool _realtimeAppliedDuringAction = false;
+
   static const _pollInterval = Duration(seconds: 12);
 
   static const _terminal = {
@@ -115,6 +121,12 @@ class FloorController extends StateNotifier<FloorState> {
 
     final id = ev.id;
     if (id == null) return;
+
+    // BUG-15: a server delta for the card currently mid-action is authoritative.
+    // Flag it so act()'s failure path skips its (now-stale) optimistic rollback.
+    if (state.busyId != null && id == state.busyId) {
+      _realtimeAppliedDuringAction = true;
+    }
 
     final known = state.transactions.any((t) => t.id == id);
     if (!known) {
@@ -192,6 +204,8 @@ class FloorController extends StateNotifier<FloorState> {
   }) async {
     if (state.busyId != null) return false;
     final original = tx.status;
+    // Reset the realtime-during-action tracker for this fresh action window.
+    _realtimeAppliedDuringAction = false;
 
     state = state.copyWith(
       busyId: tx.id,
@@ -228,18 +242,27 @@ class FloorController extends StateNotifier<FloorState> {
       }
       return true;
     } on ApiException catch (e) {
-      state = state.copyWith(
-        transactions: _withStatus(tx.id, original),
-        clearBusy: true,
-        error: e.message,
-      );
+      // BUG-15: if a realtime delta landed for this card mid-flight, it holds the
+      // authoritative server state — keep it and only clear busy + surface error.
+      state = _realtimeAppliedDuringAction
+          ? state.copyWith(clearBusy: true, error: e.message)
+          : state.copyWith(
+              transactions: _withStatus(tx.id, original),
+              clearBusy: true,
+              error: e.message,
+            );
       return false;
     } catch (_) {
-      state = state.copyWith(
-        transactions: _withStatus(tx.id, original),
-        clearBusy: true,
-        error: 'Could not update the car. Please try again.',
-      );
+      state = _realtimeAppliedDuringAction
+          ? state.copyWith(
+              clearBusy: true,
+              error: 'Could not update the car. Please try again.',
+            )
+          : state.copyWith(
+              transactions: _withStatus(tx.id, original),
+              clearBusy: true,
+              error: 'Could not update the car. Please try again.',
+            );
       return false;
     }
   }
