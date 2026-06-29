@@ -5,7 +5,19 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // The ESLint config targets the React SPA in src/ only. Without ignoring the
+  // sibling stacks' build artifacts, `npm run lint` scans minified Flutter web
+  // output (mobile-app/build), Dart tooling (.dart_tool) and the Node gateway,
+  // producing ~22k spurious errors that drown out real findings and make lint
+  // useless in CI. Ignore everything that isn't the SPA source.
+  globalIgnores([
+    'dist',
+    'mobile-app',
+    'backend',
+    'supabase',
+    '**/build/**',
+    '**/.dart_tool/**',
+  ]),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

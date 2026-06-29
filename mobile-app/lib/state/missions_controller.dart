@@ -118,7 +118,7 @@ class MissionsController extends StateNotifier<MissionsState> {
   }
 
   Future<void> load({bool silent = false}) async {
-    debugPrint('[MissionsController] load() start — silent=$silent controller=${identityHashCode(this)}');
+    if (kDebugMode) debugPrint('[MissionsController] load() start — silent=$silent controller=${identityHashCode(this)}');
     if (!silent) {
       state = state.copyWith(status: MissionsStatus.loading, clearError: true);
     }
@@ -129,21 +129,21 @@ class MissionsController extends StateNotifier<MissionsState> {
               a.status != LifecycleStatus.delivered &&
               a.status != LifecycleStatus.cancelled)
           .toList();
-      debugPrint('[MissionsController] load() SUCCESS — ${active.length} active missions → ${active.isEmpty ? "empty" : "ready"}');
+      if (kDebugMode) debugPrint('[MissionsController] load() SUCCESS — ${active.length} active missions → ${active.isEmpty ? "empty" : "ready"}');
       state = MissionsState(
         status: active.isEmpty ? MissionsStatus.empty : MissionsStatus.ready,
         missions: active,
       );
     } on ApiException catch (e) {
       // A 401 is handled by the global bounce; don't paint an error over it.
-      debugPrint('[MissionsController] load() ApiException — statusCode=${e.statusCode} isUnauthorized=${e.isUnauthorized} msg=${e.message}');
+      if (kDebugMode) debugPrint('[MissionsController] load() ApiException — statusCode=${e.statusCode} isUnauthorized=${e.isUnauthorized} msg=${e.message}');
       if (e.isUnauthorized) return;
       state = state.copyWith(
         status: MissionsStatus.error,
         error: e.message,
       );
     } catch (e, st) {
-      debugPrint('[MissionsController] load() UNEXPECTED ERROR — $e\n$st');
+      if (kDebugMode) debugPrint('[MissionsController] load() UNEXPECTED ERROR — $e\n$st');
       state = state.copyWith(
         status: MissionsStatus.error,
         error: 'Could not load your missions. Pull to retry.',
@@ -153,7 +153,7 @@ class MissionsController extends StateNotifier<MissionsState> {
 
   @override
   void dispose() {
-    debugPrint('[MissionsController] dispose() — controller=${identityHashCode(this)}');
+    if (kDebugMode) debugPrint('[MissionsController] dispose() — controller=${identityHashCode(this)}');
     _eventSub?.cancel();
     _statusSub?.cancel();
     _stopPoll();

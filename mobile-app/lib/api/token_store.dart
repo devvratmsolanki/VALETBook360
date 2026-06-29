@@ -11,7 +11,11 @@ class TokenStore {
             const FlutterSecureStorage(
               aOptions: AndroidOptions(encryptedSharedPreferences: true),
               iOptions: IOSOptions(
-                accessibility: KeychainAccessibility.first_unlock,
+                // unlocked_this_device: tokens are readable only while the device
+                // is actively unlocked, and are never migrated to a new device or
+                // included in iCloud/iTunes backups. first_unlock left them
+                // readable by background processes while the screen was locked.
+                accessibility: KeychainAccessibility.unlocked_this_device,
               ),
             );
 

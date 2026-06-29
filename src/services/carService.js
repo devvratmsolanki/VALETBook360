@@ -7,12 +7,14 @@ export const findCarByNumber = async (carNumber) => {
 };
 
 export const createCar = async (carData) => {
+    // Spread raw input FIRST so the explicit mappings below win and a caller
+    // can't smuggle arbitrary column overrides past the intended field set.
     const mappedData = {
+        ...carData,
         car_number: carData.carNumber || carData.car_number,
         make: carData.make,
         model: carData.model,
         color: carData.color,
-        ...carData
     };
     const { data, error } = await supabase.from('cars').insert(mappedData).select().single();
     if (error) throw error;
