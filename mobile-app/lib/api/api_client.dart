@@ -457,6 +457,33 @@ class ApiClient {
     }
   }
 
+  /// POST /assistant/chat → the help assistant's reply for the running
+  /// conversation (oldest→newest) plus the new user [message].
+  Future<String> askAssistant(
+    List<Map<String, String>> history,
+    String message,
+  ) async {
+    try {
+      final res = await _auth.post(
+        ApiConfig.assistantChatPath,
+        data: {
+          'messages': [
+            ...history,
+            {'role': 'user', 'content': message},
+          ],
+        },
+      );
+      _ensureOk(res);
+      final data = res.data;
+      if (data is Map && data['reply'] is String) {
+        return data['reply'] as String;
+      }
+      throw ApiException(message: 'The assistant returned an unexpected response.');
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   // ---- KEY SLOTS (Location Detail → Key Slots tab) ----
 
   /// GET /api/locations/{id}/slots → custom key slots for a location.

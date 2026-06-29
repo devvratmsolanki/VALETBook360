@@ -5,6 +5,7 @@ import 'router.dart';
 import 'state/providers.dart';
 import 'theme/v_colors.dart';
 import 'theme/v_theme.dart';
+import 'widgets/help_chatbot.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +23,8 @@ class ValetDriverApp extends ConsumerWidget {
 
     // Resolve the active brightness from the persisted theme mode + platform.
     final mode = ref.watch(themeControllerProvider);
+    // Show the help assistant only once the user is authenticated.
+    final authed = ref.watch(authControllerProvider).isAuthed;
     final platform = MediaQuery.platformBrightnessOf(context);
     final brightness = ref
         .read(themeControllerProvider.notifier)
@@ -62,7 +65,12 @@ class ValetDriverApp extends ConsumerWidget {
       // is preserved; only ephemeral view state (e.g. the selected tab) resets.
       builder: (context, child) => KeyedSubtree(
         key: ValueKey(brightness),
-        child: child ?? const SizedBox.shrink(),
+        child: Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            if (authed) const Positioned.fill(child: HelpChatbot()),
+          ],
+        ),
       ),
     );
   }

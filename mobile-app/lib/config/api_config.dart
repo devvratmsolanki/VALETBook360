@@ -70,6 +70,9 @@ class ApiConfig {
   /// is invalid or the account is inactive. Used to verify a restored session.
   static const String mePath = '/auth/me';
 
+  /// In-app help assistant (Claude) — POST {messages:[{role,content}]} → {reply}.
+  static const String assistantChatPath = '/assistant/chat';
+
   /// Tenant-scoped driver directory for the operator's assign picker. Served by
   /// the AUTH service (drivers are users) and authed with the operator's bearer
   /// token; the company scope is derived server-side from the JWT.
