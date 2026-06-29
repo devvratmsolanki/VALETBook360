@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Phone, User, Car as CarIcon, Camera, MapPin, Wrench, Search, UserCheck } from 'lucide-react';
+import { Phone, User, Car as CarIcon, Camera, MapPin, Wrench, Search, UserCheck, RefreshCw } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
@@ -9,8 +9,10 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import DriverSelect from '../../components/shared/DriverSelect';
 import { searchVisitorByPhone, getVisitorByPhone, createVisitor } from '../../services/visitorService';
 import { findCarByNumber, createCar } from '../../services/carService';
-import { createTransaction } from '../../services/transactionService';
+import { createTransaction, getActiveTransactions, getNextAvailableKeySlot } from '../../services/transactionService';
+import { getLocationSlotNames } from '../../services/slotService';
 import { getLocationsByCompany } from '../../services/locationService';
+import { cn } from '../../lib/utils';
 import logger from '../../lib/logger';
 
 const CheckIn = () => {
@@ -28,8 +30,47 @@ const CheckIn = () => {
     const [existingVisitor, setExistingVisitor] = useState(null);
     const [isReturning, setIsReturning] = useState(false);
     const [locations, setLocations] = useState([]);
+    // Key-slot auto-allocation: the location's ordered pool, the occupied set
+    // (active cars' key codes), and the currently-selected slot (auto-defaulted
+    // to the lowest free slot; the operator can tap another free box to override).
+    const [slotNames, setSlotNames] = useState([]);
+    const [occupiedSlots, setOccupiedSlots] = useState(new Set());
+    const [keyCode, setKeyCode] = useState('');
     const dropdownRef = useRef(null);
     const fileInputRef = useRef(null);
+
+    // Load the selected location's slot pool + occupancy and auto-pick the next
+    // free slot. Runs whenever the chosen location changes (and after a check-in,
+    // so the freshly-used slot greys out and the default advances).
+    const loadSlots = async (locationId) => {
+        if (!locationId) {
+            setSlotNames([]); setOccupiedSlots(new Set()); setKeyCode('');
+            return;
+        }
+        try {
+            const [names, nextSlot, activeTxs] = await Promise.all([
+                getLocationSlotNames(locationId),
+                getNextAvailableKeySlot(locationId),
+                getActiveTransactions(companyId),
+            ]);
+            setSlotNames(names);
+            setOccupiedSlots(new Set(
+                activeTxs
+                    .filter(t => t.location_id === locationId && t.key_code &&
+                        !['delivered', 'cancelled'].includes(t.status))
+                    .map(t => t.key_code)
+            ));
+            setKeyCode(nextSlot || '');
+        } catch (err) {
+            logger.error('Error loading key slots:', err);
+        }
+    };
+
+    // (Re)load slots when the location or company becomes available.
+    useEffect(() => {
+        loadSlots(selectedLocationId);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedLocationId, companyId]);
 
     // Fetch locations
     useEffect(() => {
@@ -107,6 +148,15 @@ const CheckIn = () => {
             toast.error('Please select a driver');
             return;
         }
+        if (slotNames.length > 0 && !keyCode) {
+            toast.error('Please assign a key slot');
+            return;
+        }
+        if (keyCode && occupiedSlots.has(keyCode)) {
+            toast.error(`Slot ${keyCode} was just taken — pick another`);
+            loadSlots(selectedLocationId);
+            return;
+        }
         setLoading(true);
         try {
             let visitorId;
@@ -136,6 +186,7 @@ const CheckIn = () => {
                 visitor_id: visitorId,
                 car_id: carId,
                 parking_slot: parkingLocation || null,
+                key_code: keyCode || null,
                 status: 'parked',
                 valet_company_id: companyId || null,
             };
@@ -166,8 +217,11 @@ const CheckIn = () => {
 
             toast.success('Vehicle checked in successfully!');
             setPhone(''); setName(''); setCarNumber(''); setCarMake('');
-            setParkingLocation(''); setSelectedDriver(''); setSelectedLocationId('');
+            setParkingLocation(''); setSelectedDriver('');
             setExistingVisitor(null); setIsReturning(false);
+            // Keep the location and refresh the pool so the just-used slot greys
+            // out and the next free slot auto-selects for the next car.
+            loadSlots(selectedLocationId);
         } catch (err) {
             toast.error(err.message || 'Failed to check in vehicle');
         } finally {
@@ -284,6 +338,55 @@ const CheckIn = () => {
                                 className="block w-full rounded-xl border-0 bg-dark-600 py-3 pl-10 pr-4 text-gray-200 placeholder:text-gray-500 ring-1 ring-white/5 focus:ring-2 focus:ring-brand-500/50 sm:text-sm transition-all" />
                         </div>
                     </div>
+
+                    {/* Key Slot — auto-allocated to lowest free, tap to override */}
+                    {selectedLocationId && (
+                        <div className="space-y-1.5">
+                            <label className="flex items-center justify-between text-sm font-medium text-gray-300">
+                                <span className="flex items-center gap-2">🔑 Key Slot <span className="text-red-400">*</span></span>
+                                <span className="flex items-center gap-2 text-[11px] font-normal text-gray-500">
+                                    {keyCode ? <span className="text-brand-400 font-semibold">Auto: {keyCode}</span> : 'Pick a slot'}
+                                    {slotNames.length > 0 && <span>• {slotNames.length} total</span>}
+                                    <button type="button" onClick={() => loadSlots(selectedLocationId)} className="p-1 rounded-md hover:bg-white/5 text-gray-500 hover:text-white transition-colors" title="Refresh slots & re-pick">
+                                        <RefreshCw className="h-3 w-3" />
+                                    </button>
+                                </span>
+                            </label>
+                            {slotNames.length === 0 ? (
+                                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-400">
+                                    No key slots configured for this location. Set a key capacity or add slots in the location settings.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-5 sm:grid-cols-6 gap-1.5 max-h-44 overflow-y-auto pr-1 rounded-xl border border-white/5 bg-dark-700/40 p-2">
+                                    {slotNames.map((slotName) => {
+                                        const isOccupied = occupiedSlots.has(slotName);
+                                        const isSelected = keyCode === slotName;
+                                        return (
+                                            <button
+                                                key={slotName}
+                                                type="button"
+                                                disabled={isOccupied}
+                                                onClick={() => setKeyCode(slotName)}
+                                                aria-label={`Key slot ${slotName}${isOccupied ? ' (occupied)' : isSelected ? ' (selected)' : ' (free)'}`}
+                                                aria-pressed={isSelected}
+                                                title={isOccupied ? `Slot ${slotName} is occupied` : `Assign slot ${slotName}`}
+                                                className={cn(
+                                                    'aspect-square rounded-lg border text-xs font-bold flex items-center justify-center px-1 truncate transition-all',
+                                                    isOccupied
+                                                        ? 'bg-dark-700 border-white/5 text-gray-600 opacity-40 cursor-not-allowed line-through'
+                                                        : isSelected
+                                                            ? 'bg-brand-500 text-black border-brand-400 shadow-lg shadow-brand-500/20 scale-105'
+                                                            : 'bg-dark-600 border-white/5 text-gray-300 hover:border-brand-500/40 hover:text-brand-400'
+                                                )}
+                                            >
+                                                {slotName}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Driver Select */}
                     <DriverSelect
