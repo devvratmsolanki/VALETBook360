@@ -207,22 +207,39 @@ class _DashboardTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(companyHistoryProvider);
-    // Location names for the live "Active by Location" breakdown.
+    final detail = ref.watch(companyDetailControllerProvider(companyId));
     final locNames = {
-      for (final l in ref.watch(companyDetailControllerProvider(companyId)).locations)
-        l.id: l.name,
+      for (final l in detail.locations) l.id: l.name,
+    };
+    final driverNames = {
+      for (final d in detail.drivers) d.id: (d.name ?? d.email),
     };
     return history.when(
       loading: _loading,
       error: (e, _) =>
           _error('Could not load the dashboard.', () => ref.invalidate(companyHistoryProvider)),
       data: (all) {
-        final active =
-            all.where((t) => !_terminal.contains(t.status)).toList();
-        final requested = all
-            .where((t) => t.status == LifecycleStatus.requested)
-            .length;
+        final active = all.where((t) => !_terminal.contains(t.status)).toList();
+        final delivered = all.where((t) => t.status == LifecycleStatus.delivered).toList();
+        final requested = all.where((t) => t.status == LifecycleStatus.requested).length;
         final today = all.where((t) => _isToday(t.createdAt)).length;
+        final completionPct = all.isEmpty
+            ? 0
+            : ((delivered.length / all.length) * 100).round();
+
+        // Avg retrieval time (requested → delivered), minutes.
+        String avgRetrieval = '—';
+        final timed = delivered
+            .where((t) => t.requestedAt != null && t.deliveredAt != null)
+            .toList();
+        if (timed.isNotEmpty) {
+          final totalMins = timed.fold<int>(
+              0,
+              (sum, t) =>
+                  sum +
+                  t.deliveredAt!.difference(t.requestedAt!).inMinutes.abs());
+          avgRetrieval = '${(totalMins / timed.length).round()} min';
+        }
 
         // Active cars grouped by location, busiest first.
         final byLoc = <String, int>{};
@@ -233,6 +250,26 @@ class _DashboardTab extends ConsumerWidget {
         final byLocSorted = byLoc.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
 
+        // 7-day volume bars (0 = today, going back).
+        final now = DateTime.now();
+        final weekVolume = List.filled(7, 0);
+        for (final t in all) {
+          if (t.createdAt == null) continue;
+          final diff = now.difference(t.createdAt!.toLocal()).inDays;
+          if (diff >= 0 && diff < 7) weekVolume[diff]++;
+        }
+
+        // Driver leaderboard — top 5 by delivered count.
+        final drvDelivered = <String, int>{};
+        for (final t in delivered) {
+          final id = t.retrievedByDriverId ?? t.parkedByDriverId;
+          if (id == null) continue;
+          drvDelivered[id] = (drvDelivered[id] ?? 0) + 1;
+        }
+        final leaderboard = drvDelivered.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+        final top5 = leaderboard.take(5).toList();
+
         final stats = [
           _StatCardData('Active Cars', active.length.toString(),
               Icons.directions_car_filled_rounded, VColors.brand400),
@@ -240,8 +277,8 @@ class _DashboardTab extends ConsumerWidget {
               Icons.trending_up_rounded, VColors.alertSuccess),
           _StatCardData('Requested', requested.toString(),
               Icons.schedule_rounded, VColors.statusReady),
-          _StatCardData('Total Transactions', all.length.toString(),
-              Icons.bar_chart_rounded, VColors.brand300),
+          _StatCardData('Completion', '$completionPct%',
+              Icons.check_circle_outline_rounded, VColors.brand300),
         ];
 
         return RefreshIndicator(
@@ -249,58 +286,248 @@ class _DashboardTab extends ConsumerWidget {
           onRefresh: () async => ref.invalidate(companyHistoryProvider),
           child: Center(
             child: ConstrainedBox(
-              constraints:
-                  BoxConstraints(maxWidth: context.dashboardMaxWidth),
+              constraints: BoxConstraints(maxWidth: context.dashboardMaxWidth),
               child: ListView(
-            padding: const EdgeInsets.all(VSpace.x4),
-            children: [
-              GridView.count(
-                crossAxisCount:
-                    context.responsive(compact: 2, expanded: 3, large: 4),
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: VSpace.x3,
-                crossAxisSpacing: VSpace.x3,
-                childAspectRatio:
-                    context.responsive(compact: 1.7, expanded: 2.0, large: 2.2),
-                children: [for (final s in stats) _StatCard(data: s)],
-              ),
-              if (byLocSorted.isNotEmpty) ...[
-                const SizedBox(height: VSpace.x6),
-                Text('Active by Location',
-                    style: VType.label.copyWith(color: VColors.contentStrong)),
-                const SizedBox(height: VSpace.x2),
-                Wrap(
-                  spacing: VSpace.x2,
-                  runSpacing: VSpace.x2,
-                  children: [
-                    for (final e in byLocSorted)
-                      _LocationActiveChip(name: e.key, count: e.value),
-                  ],
-                ),
-              ],
-              const SizedBox(height: VSpace.x6),
-              Text('Active Vehicles',
-                  style:
-                      VType.label.copyWith(color: VColors.contentStrong)),
-              const SizedBox(height: VSpace.x2),
-              if (active.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: VSpace.x6),
-                  child: VEmptyState(
-                    icon: Icons.local_parking_rounded,
-                    headline: 'No active vehicles',
-                    hint: 'Cars on the floor will show up here.',
+                padding: const EdgeInsets.all(VSpace.x4),
+                children: [
+                  // KPI grid
+                  GridView.count(
+                    crossAxisCount:
+                        context.responsive(compact: 2, expanded: 3, large: 4),
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: VSpace.x3,
+                    crossAxisSpacing: VSpace.x3,
+                    childAspectRatio:
+                        context.responsive(compact: 1.7, expanded: 2.0, large: 2.2),
+                    children: [for (final s in stats) _StatCard(data: s)],
                   ),
-                )
-              else
-                for (final tx in active) _ActiveRow(tx: tx),
-            ],
+                  // Avg retrieval time inline
+                  if (timed.isNotEmpty) ...[
+                    const SizedBox(height: VSpace.x3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: VSpace.x4, vertical: VSpace.x3),
+                      decoration: BoxDecoration(
+                        color: VColors.surface900,
+                        borderRadius: BorderRadius.circular(VRadius.md),
+                        border: Border.all(color: VColors.surface700),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.timer_outlined,
+                              size: 16, color: VColors.contentMuted),
+                          const SizedBox(width: VSpace.x2),
+                          Text('Avg retrieval time',
+                              style: VType.caption
+                                  .copyWith(color: VColors.contentMuted)),
+                          const Spacer(),
+                          Text(avgRetrieval,
+                              style: VType.label
+                                  .copyWith(color: VColors.contentStrong)),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // 7-day bar chart
+                  const SizedBox(height: VSpace.x6),
+                  Text('7-day check-in volume',
+                      style: VType.label
+                          .copyWith(color: VColors.contentStrong)),
+                  const SizedBox(height: VSpace.x3),
+                  _WeekBarChart(dailyCounts: weekVolume),
+
+                  // Active by Location
+                  if (byLocSorted.isNotEmpty) ...[
+                    const SizedBox(height: VSpace.x6),
+                    Text('Active by Location',
+                        style: VType.label
+                            .copyWith(color: VColors.contentStrong)),
+                    const SizedBox(height: VSpace.x2),
+                    Wrap(
+                      spacing: VSpace.x2,
+                      runSpacing: VSpace.x2,
+                      children: [
+                        for (final e in byLocSorted)
+                          _LocationActiveChip(name: e.key, count: e.value),
+                      ],
+                    ),
+                  ],
+
+                  // Driver leaderboard
+                  if (top5.isNotEmpty) ...[
+                    const SizedBox(height: VSpace.x6),
+                    Text('Top drivers',
+                        style: VType.label
+                            .copyWith(color: VColors.contentStrong)),
+                    const SizedBox(height: VSpace.x2),
+                    for (var i = 0; i < top5.length; i++)
+                      _LeaderboardRow(
+                        rank: i + 1,
+                        name: driverNames[top5[i].key] ?? 'Driver',
+                        delivered: top5[i].value,
+                      ),
+                  ],
+
+                  // Active vehicles list
+                  const SizedBox(height: VSpace.x6),
+                  Text('Active Vehicles',
+                      style:
+                          VType.label.copyWith(color: VColors.contentStrong)),
+                  const SizedBox(height: VSpace.x2),
+                  if (active.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: VSpace.x6),
+                      child: VEmptyState(
+                        icon: Icons.local_parking_rounded,
+                        headline: 'No active vehicles',
+                        hint: 'Cars on the floor will show up here.',
+                      ),
+                    )
+                  else
+                    for (final tx in active) _ActiveRow(tx: tx),
+                ],
               ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// Mini 7-bar chart using pure CustomPaint — no extra deps.
+class _WeekBarChart extends StatelessWidget {
+  const _WeekBarChart({required this.dailyCounts});
+  // dailyCounts[0] = today, [6] = 6 days ago.
+  final List<int> dailyCounts;
+
+  @override
+  Widget build(BuildContext context) {
+    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final now = DateTime.now();
+    // Labels: oldest left → today right.
+    final labels = List.generate(
+        7, (i) => days[(now.subtract(Duration(days: 6 - i)).weekday - 1) % 7]);
+    final counts = List.generate(7, (i) => dailyCounts[6 - i]);
+    final maxVal = counts.fold(0, (m, v) => v > m ? v : m);
+
+    return Container(
+      height: 110,
+      padding: const EdgeInsets.fromLTRB(VSpace.x4, VSpace.x3, VSpace.x4, VSpace.x2),
+      decoration: BoxDecoration(
+        color: VColors.surface900,
+        borderRadius: BorderRadius.circular(VRadius.lg),
+        border: Border.all(color: VColors.surface700),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: List.generate(7, (i) {
+          final isToday = i == 6;
+          final frac = maxVal > 0 ? counts[i] / maxVal : 0.0;
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // Count label when > 0
+                  if (counts[i] > 0)
+                    Text('${counts[i]}',
+                        style: VType.caption.copyWith(
+                            fontSize: 10,
+                            color: isToday
+                                ? VColors.brand300
+                                : VColors.contentFaint)),
+                  const SizedBox(height: 2),
+                  // Bar
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeOut,
+                    height: 54 * frac + (frac > 0 ? 4 : 0),
+                    decoration: BoxDecoration(
+                      color: isToday
+                          ? VColors.brand400
+                          : VColors.brand400.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(VRadius.sm),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Day label
+                  Text(labels[i],
+                      style: VType.caption.copyWith(
+                          fontSize: 10,
+                          color: isToday
+                              ? VColors.brand300
+                              : VColors.contentFaint,
+                          fontWeight: isToday
+                              ? FontWeight.w700
+                              : FontWeight.w400)),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _LeaderboardRow extends StatelessWidget {
+  const _LeaderboardRow(
+      {required this.rank, required this.name, required this.delivered});
+  final int rank;
+  final String name;
+  final int delivered;
+
+  @override
+  Widget build(BuildContext context) {
+    final isTop = rank == 1;
+    return Container(
+      margin: const EdgeInsets.only(bottom: VSpace.x2),
+      padding: const EdgeInsets.symmetric(
+          horizontal: VSpace.x4, vertical: VSpace.x3),
+      decoration: BoxDecoration(
+        color: VColors.surface900,
+        borderRadius: BorderRadius.circular(VRadius.md),
+        border: Border.all(
+          color: isTop
+              ? VColors.brand400.withValues(alpha: 0.4)
+              : VColors.surface700,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isTop
+                  ? VColors.brand500.withValues(alpha: 0.15)
+                  : VColors.surface700,
+              borderRadius: BorderRadius.circular(VRadius.sm),
+            ),
+            child: Text(
+              '$rank',
+              style: VType.caption.copyWith(
+                color: isTop ? VColors.brand300 : VColors.contentMuted,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: VSpace.x3),
+          Expanded(
+            child: Text(name,
+                style:
+                    VType.body.copyWith(color: VColors.contentStrong),
+                overflow: TextOverflow.ellipsis),
+          ),
+          Text('$delivered delivered',
+              style: VType.label.copyWith(color: VColors.brand300)),
+        ],
+      ),
     );
   }
 }
