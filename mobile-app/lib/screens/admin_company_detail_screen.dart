@@ -174,6 +174,7 @@ class _LocationsTab extends ConsumerWidget {
           context,
           onSubmit: notifier.addLocation,
           errorReader: () => notifier.createError,
+          facilityOwners: state.facilityOwners,
         );
 
     Future<void> edit(AdminLocation loc) => AdminLocationSheet.show(
@@ -181,6 +182,7 @@ class _LocationsTab extends ConsumerWidget {
           existing: loc,
           onSubmit: (input) => notifier.editLocation(loc.id, input),
           errorReader: () => notifier.createError,
+          facilityOwners: state.facilityOwners,
         );
 
     Future<void> delete(AdminLocation loc) async {
