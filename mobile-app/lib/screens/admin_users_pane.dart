@@ -10,9 +10,8 @@ import '../theme/v_tokens.dart';
 import '../widgets/v_adaptive.dart';
 import '../widgets/v_states.dart';
 
-/// Hierarchical users pane (ADMIN) — re-platforms `Users.jsx`: a Super Admins
-/// section at the top, then one collapsible card per company bucketing
-/// Company Owners (manager) / Operators (valet) / Drivers (driver).
+/// Hierarchical users pane (ADMIN) — super-admins section + one collapsible
+/// card per company bucketing Owners / Operators / Drivers.
 class AdminUsersPane extends ConsumerWidget {
   const AdminUsersPane({super.key});
 
@@ -44,8 +43,7 @@ class AdminUsersPane extends ConsumerWidget {
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
-              SizedBox(
-                  height: context.responsive(compact: 80, expanded: 160)),
+              SizedBox(height: context.responsive(compact: 80, expanded: 160)),
               const VEmptyState(
                 icon: Icons.people_outline_rounded,
                 headline: 'No users yet',
@@ -75,8 +73,8 @@ class AdminUsersPane extends ConsumerWidget {
       onRefresh: notifier.load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding:
-            const EdgeInsets.fromLTRB(VSpace.x4, VSpace.x4, VSpace.x4, VSpace.x6),
+        padding: const EdgeInsets.fromLTRB(
+            VSpace.x4, VSpace.x4, VSpace.x4, VSpace.x6),
         children: [
           VBoundedContent(
             padding: EdgeInsets.zero,
@@ -84,22 +82,22 @@ class AdminUsersPane extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (superAdmins.isNotEmpty) ...[
-                  _SectionLabel(
-                      label: 'Super Admins', count: superAdmins.length),
-                  Container(
-                    padding: const EdgeInsets.all(VSpace.x2),
-                    decoration: BoxDecoration(
-                      color: VColors.surface900,
-                      borderRadius: BorderRadius.circular(VRadius.lg),
-                      border: Border.all(color: VColors.surface700, width: 1),
-                    ),
-                    child: Column(
-                      children: [
-                        for (final u in superAdmins) _UserRow(user: u),
-                      ],
-                    ),
+                  _SectionLabel(label: 'Super Admins', count: superAdmins.length),
+                  Column(
+                    children: superAdmins
+                        .map((u) => Padding(
+                              padding:
+                                  const EdgeInsets.only(bottom: VSpace.x2),
+                              child: _SuperAdminCard(user: u),
+                            ))
+                        .toList(),
                   ),
                   const SizedBox(height: VSpace.x5),
+                ],
+                if (companyNames.isNotEmpty) ...[
+                  _SectionLabel(
+                      label: 'Companies', count: byCompany.length),
+                  const SizedBox(height: VSpace.x1),
                 ],
                 VResponsiveGrid(
                   spacing: VSpace.x3,
@@ -139,15 +137,108 @@ class _SectionLabel extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               )),
           const SizedBox(width: VSpace.x2),
-          Text('$count',
-              style: VType.caption.copyWith(color: VColors.contentFaint)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: VColors.surface700,
+              borderRadius: BorderRadius.circular(VRadius.full),
+            ),
+            child: Text('$count',
+                style: VType.caption.copyWith(
+                    color: VColors.contentMuted, fontWeight: FontWeight.w600)),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Collapsible company card bucketing owners / operators / drivers.
+// ---------------------------------------------------------------------------
+// Super-admin standalone card
+// ---------------------------------------------------------------------------
+
+class _SuperAdminCard extends StatelessWidget {
+  const _SuperAdminCard({required this.user});
+  final AdminUser user;
+
+  String get _initials {
+    final name = user.displayName.trim();
+    final parts = name.split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(VSpace.x4),
+      decoration: BoxDecoration(
+        color: VColors.surface900,
+        borderRadius: BorderRadius.circular(VRadius.lg),
+        border: Border.all(color: VColors.surface700, width: 1),
+      ),
+      child: Row(
+        children: [
+          // Avatar with gradient-like accent background
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: VColors.brand700,
+              borderRadius: BorderRadius.circular(VRadius.md),
+            ),
+            alignment: Alignment.center,
+            child: Text(_initials,
+                style: VType.label.copyWith(
+                    color: VColors.contentOnAccent, fontSize: 14)),
+          ),
+          const SizedBox(width: VSpace.x3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(user.displayName,
+                    style: VType.label.copyWith(color: VColors.contentStrong),
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text(user.email,
+                    style: VType.caption, overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+          // Shield badge
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: VColors.brand900,
+              borderRadius: BorderRadius.circular(VRadius.full),
+              border: Border.all(
+                  color: VColors.brand400.withValues(alpha: 0.4), width: 1),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.shield_rounded, size: 11, color: VColors.brand300),
+                const SizedBox(width: 4),
+                Text('Admin',
+                    style: VType.caption.copyWith(
+                        color: VColors.brand300, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Company group — collapsible with buckets
+// ---------------------------------------------------------------------------
+
 class _CompanyCard extends StatefulWidget {
   const _CompanyCard({required this.name, required this.users});
   final String name;
@@ -165,6 +256,7 @@ class _CompanyCardState extends State<_CompanyCard> {
     final owners = widget.users.where((u) => u.isManager).toList();
     final operators = widget.users.where((u) => u.isOperator).toList();
     final drivers = widget.users.where((u) => u.isDriver).toList();
+    final active = widget.users.where((u) => u.active).length;
 
     return Container(
       decoration: BoxDecoration(
@@ -175,31 +267,63 @@ class _CompanyCardState extends State<_CompanyCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // ---- Header ----
           InkWell(
-            borderRadius: BorderRadius.circular(VRadius.lg),
+            borderRadius: BorderRadius.vertical(
+                top: Radius.circular(VRadius.lg),
+                bottom: _expanded ? Radius.zero : Radius.circular(VRadius.lg)),
             onTap: () => setState(() => _expanded = !_expanded),
             child: Padding(
               padding: const EdgeInsets.all(VSpace.x4),
               child: Row(
                 children: [
-                  Icon(Icons.business_rounded,
-                      size: 20, color: VColors.brand300),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: VColors.brand900,
+                      borderRadius: BorderRadius.circular(VRadius.md),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(Icons.business_rounded,
+                        size: 18, color: VColors.brand300),
+                  ),
                   const SizedBox(width: VSpace.x3),
                   Expanded(
-                    child: Text(widget.name,
-                        style: VType.bodyLg
-                            .copyWith(color: VColors.contentStrong),
-                        overflow: TextOverflow.ellipsis),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.name,
+                            style: VType.label
+                                .copyWith(color: VColors.contentStrong),
+                            overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${widget.users.length} members · $active active',
+                          style: VType.caption,
+                        ),
+                      ],
+                    ),
                   ),
-                  Text('${widget.users.length}',
-                      style: VType.caption
-                          .copyWith(color: VColors.contentMuted)),
-                  const SizedBox(width: VSpace.x2),
+                  // Mini count chips
+                  if (!_expanded) ...[
+                    _CountChip(
+                        icon: Icons.person_pin_circle_rounded,
+                        count: drivers.length,
+                        color: VColors.brand300),
+                    const SizedBox(width: VSpace.x1),
+                    _CountChip(
+                        icon: Icons.badge_rounded,
+                        count: operators.length,
+                        color: VColors.contentMuted),
+                    const SizedBox(width: VSpace.x2),
+                  ],
                   Icon(
                     _expanded
                         ? Icons.expand_less_rounded
                         : Icons.expand_more_rounded,
                     color: VColors.contentMuted,
+                    size: 20,
                   ),
                 ],
               ),
@@ -213,9 +337,9 @@ class _CompanyCardState extends State<_CompanyCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _bucket('Company Owners', owners),
-                  _bucket('Operators', operators),
-                  _bucket('Drivers', drivers),
+                  _bucket('Owner', Icons.manage_accounts_rounded, owners),
+                  _bucket('Operators', Icons.badge_rounded, operators),
+                  _bucket('Drivers', Icons.person_pin_circle_rounded, drivers),
                 ],
               ),
             ),
@@ -225,7 +349,7 @@ class _CompanyCardState extends State<_CompanyCard> {
     );
   }
 
-  Widget _bucket(String label, List<AdminUser> users) {
+  Widget _bucket(String label, IconData icon, List<AdminUser> users) {
     if (users.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: VSpace.x3),
@@ -234,56 +358,136 @@ class _CompanyCardState extends State<_CompanyCard> {
         children: [
           Padding(
             padding: const EdgeInsets.only(bottom: VSpace.x2, top: VSpace.x1),
-            child: Text(label.toUpperCase(),
-                style: VType.caption.copyWith(
-                  color: VColors.contentFaint,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w600,
-                )),
+            child: Row(
+              children: [
+                Icon(icon, size: 13, color: VColors.contentFaint),
+                const SizedBox(width: 5),
+                Text(label.toUpperCase(),
+                    style: VType.caption.copyWith(
+                      color: VColors.contentFaint,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w600,
+                    )),
+              ],
+            ),
           ),
-          for (final u in users) _UserRow(user: u),
+          ...users.map((u) => Padding(
+                padding: const EdgeInsets.only(bottom: VSpace.x2),
+                child: _UserRow(user: u),
+              )),
         ],
       ),
     );
   }
 }
 
+class _CountChip extends StatelessWidget {
+  const _CountChip(
+      {required this.icon, required this.count, required this.color});
+  final IconData icon;
+  final int count;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: VColors.surface700,
+        borderRadius: BorderRadius.circular(VRadius.full),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 3),
+          Text('$count',
+              style:
+                  VType.caption.copyWith(color: color, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// User row inside company bucket
+// ---------------------------------------------------------------------------
+
 class _UserRow extends StatelessWidget {
   const _UserRow({required this.user});
   final AdminUser user;
 
+  String get _initials {
+    final name = user.displayName.trim();
+    final parts = name.split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final icon = switch (user.role) {
-      'admin' => Icons.shield_rounded,
-      'manager' => Icons.account_circle_rounded,
-      'valet' => Icons.badge_rounded,
-      'driver' => Icons.person_pin_circle_rounded,
-      _ => Icons.person_rounded,
-    };
+    final isActive = user.active;
+    final activeColor = isActive ? VColors.alertSuccess : VColors.contentFaint;
+
     return Container(
-      constraints: const BoxConstraints(minHeight: VTarget.minTouch),
-      padding: const EdgeInsets.symmetric(vertical: VSpace.x2),
+      padding: const EdgeInsets.symmetric(
+          horizontal: VSpace.x3, vertical: VSpace.x2 + 2),
+      decoration: BoxDecoration(
+        color: VColors.surface800,
+        borderRadius: BorderRadius.circular(VRadius.md),
+        border: Border.all(
+          color: isActive
+              ? VColors.alertSuccess.withValues(alpha: 0.2)
+              : VColors.surface600,
+          width: 1,
+        ),
+      ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: VColors.contentMuted),
-          const SizedBox(width: VSpace.x3),
+          // Initials avatar
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: VColors.brand900,
+              borderRadius: BorderRadius.circular(VRadius.sm),
+            ),
+            alignment: Alignment.center,
+            child: Text(_initials,
+                style:
+                    VType.caption.copyWith(color: VColors.brand300, fontSize: 12)),
+          ),
+          const SizedBox(width: VSpace.x2 + 2),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(user.displayName,
-                    style:
-                        VType.body.copyWith(color: VColors.contentStrong),
+                    style: VType.body.copyWith(color: VColors.contentStrong),
                     overflow: TextOverflow.ellipsis),
                 Text(user.email,
                     style: VType.caption, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
-          if (!user.active)
-            Text('Inactive',
-                style: VType.caption.copyWith(color: VColors.contentFaint)),
+          // Active/inactive dot + label
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: activeColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            isActive ? 'Active' : 'Inactive',
+            style: VType.caption.copyWith(
+                color: activeColor, fontWeight: FontWeight.w600, fontSize: 11),
+          ),
         ],
       ),
     );

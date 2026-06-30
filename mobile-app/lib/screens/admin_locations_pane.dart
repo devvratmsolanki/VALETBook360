@@ -11,9 +11,8 @@ import '../widgets/v_adaptive.dart';
 import '../widgets/v_states.dart';
 import 'admin_location_create_screen.dart';
 
-/// All-locations pane (ADMIN) — re-platforms `AdminLocations.jsx`: every
-/// location across every company, grouped by company. Each row is editable in
-/// place; the company group header carries an inline add.
+/// All-locations pane (ADMIN) — every location across every company,
+/// grouped by company. Each card is editable; the header carries an inline add.
 class AdminLocationsPane extends ConsumerWidget {
   const AdminLocationsPane({super.key});
 
@@ -45,8 +44,7 @@ class AdminLocationsPane extends ConsumerWidget {
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
-              SizedBox(
-                  height: context.responsive(compact: 80, expanded: 160)),
+              SizedBox(height: context.responsive(compact: 80, expanded: 160)),
               const VEmptyState(
                 icon: Icons.location_off_outlined,
                 headline: 'No locations yet',
@@ -88,8 +86,8 @@ class AdminLocationsPane extends ConsumerWidget {
       onRefresh: notifier.load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding:
-            const EdgeInsets.fromLTRB(VSpace.x4, VSpace.x4, VSpace.x4, VSpace.x6),
+        padding: const EdgeInsets.fromLTRB(
+            VSpace.x4, VSpace.x4, VSpace.x4, VSpace.x6),
         children: [
           VBoundedContent(
             padding: EdgeInsets.zero,
@@ -107,11 +105,11 @@ class AdminLocationsPane extends ConsumerWidget {
                     runSpacing: VSpace.x3,
                     children: [
                       for (final loc in groups[name]!)
-                        _LocationRow(
+                        _LocationCard(
                             location: loc, onEdit: () => edit(loc)),
                     ],
                   ),
-                  const SizedBox(height: VSpace.x4),
+                  const SizedBox(height: VSpace.x5),
                 ],
               ],
             ),
@@ -139,19 +137,33 @@ class _CompanyGroupHeader extends StatelessWidget {
       padding: const EdgeInsets.only(top: VSpace.x2, bottom: VSpace.x3),
       child: Row(
         children: [
-          Expanded(
-            child: Text(name.toUpperCase(),
-                style: VType.caption.copyWith(
-                  color: VColors.contentMuted,
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.w600,
-                ),
-                overflow: TextOverflow.ellipsis),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: VColors.brand900,
+              borderRadius: BorderRadius.circular(VRadius.sm),
+            ),
+            alignment: Alignment.center,
+            child: Icon(Icons.business_rounded, size: 15, color: VColors.brand300),
           ),
           const SizedBox(width: VSpace.x2),
-          Text('$count',
-              style: VType.caption.copyWith(color: VColors.contentFaint)),
-          const SizedBox(width: VSpace.x2),
+          Expanded(
+            child: Text(name,
+                style: VType.label.copyWith(color: VColors.contentStrong),
+                overflow: TextOverflow.ellipsis),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: VColors.surface700,
+              borderRadius: BorderRadius.circular(VRadius.full),
+            ),
+            child: Text('$count',
+                style: VType.caption.copyWith(
+                    color: VColors.contentMuted, fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(width: VSpace.x1),
           IconButton(
             tooltip: 'Add location',
             visualDensity: VisualDensity.compact,
@@ -165,60 +177,101 @@ class _CompanyGroupHeader extends StatelessWidget {
   }
 }
 
-class _LocationRow extends StatelessWidget {
-  const _LocationRow({required this.location, required this.onEdit});
+class _LocationCard extends StatelessWidget {
+  const _LocationCard({required this.location, required this.onEdit});
   final AdminLocation location;
   final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
+    final subtitle = location.locationLine.isNotEmpty
+        ? location.locationLine
+        : 'No address set';
+
     return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: VSpace.x4, vertical: VSpace.x3),
       decoration: BoxDecoration(
         color: VColors.surface900,
-        borderRadius: BorderRadius.circular(VRadius.md),
+        borderRadius: BorderRadius.circular(VRadius.lg),
         border: Border.all(color: VColors.surface700, width: 1),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(Icons.place_rounded, size: 20, color: VColors.brand300),
-          const SizedBox(width: VSpace.x3),
-          Expanded(
-            child: Column(
+          // ---- Top: icon + name + edit ----
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                VSpace.x4, VSpace.x4, VSpace.x2, VSpace.x3),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(location.name,
-                    style:
-                        VType.label.copyWith(color: VColors.contentStrong),
-                    overflow: TextOverflow.ellipsis),
-                const SizedBox(height: VSpace.x1),
-                Text(
-                  location.locationLine.isNotEmpty
-                      ? location.locationLine
-                      : '${location.keyCapacity} key slots',
-                  style: VType.caption,
-                  overflow: TextOverflow.ellipsis,
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: VColors.brand900,
+                    borderRadius: BorderRadius.circular(VRadius.md),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(Icons.place_rounded,
+                      size: 20, color: VColors.brand300),
+                ),
+                const SizedBox(width: VSpace.x3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(location.name,
+                          style: VType.label
+                              .copyWith(color: VColors.contentStrong),
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(subtitle,
+                          style: VType.caption,
+                          overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Edit',
+                  icon: Icon(Icons.edit_outlined,
+                      size: 18, color: VColors.contentMuted),
+                  onPressed: onEdit,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: VSpace.x2),
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: VSpace.x2, vertical: 2),
-            decoration: BoxDecoration(
-              color: VColors.brand900,
-              borderRadius: BorderRadius.circular(VRadius.full),
+          // ---- Divider ----
+          Divider(height: 1, color: VColors.surface700),
+          // ---- Bottom: key capacity chip ----
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                VSpace.x4, VSpace.x2, VSpace.x4, VSpace.x2),
+            child: Row(
+              children: [
+                Icon(Icons.vpn_key_rounded,
+                    size: 14, color: VColors.contentMuted),
+                const SizedBox(width: 5),
+                Text('${location.keyCapacity} key slots',
+                    style: VType.caption.copyWith(
+                        color: VColors.contentMuted,
+                        fontWeight: FontWeight.w500)),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: VColors.brand900,
+                    borderRadius: BorderRadius.circular(VRadius.full),
+                    border: Border.all(
+                        color: VColors.brand400.withValues(alpha: 0.4),
+                        width: 1),
+                  ),
+                  child: Text('${location.keyCapacity} keys',
+                      style: VType.caption.copyWith(
+                          color: VColors.brand300,
+                          fontWeight: FontWeight.w600)),
+                ),
+              ],
             ),
-            child: Text('${location.keyCapacity} keys',
-                style: VType.caption.copyWith(color: VColors.brand300)),
-          ),
-          IconButton(
-            tooltip: 'Edit',
-            icon: Icon(Icons.edit_outlined,
-                size: 20, color: VColors.contentMuted),
-            onPressed: onEdit,
           ),
         ],
       ),

@@ -64,6 +64,7 @@ export const updateUser = async (id, updates) => {
     if (updates.name !== undefined) allowed.name = updates.name;
     if (updates.email !== undefined) allowed.email = updates.email;
     if (updates.location_id !== undefined) allowed.location_id = updates.location_id;
+    if (updates.is_active !== undefined) allowed.is_active = updates.is_active;
     if (updates.role !== undefined) {
         assertRoleAssignable(updates.role);
         allowed.role = updates.role;
@@ -72,6 +73,12 @@ export const updateUser = async (id, updates) => {
     if (error) throw error;
     return data;
 };
+
+/**
+ * Toggle the is_active flag on a user (operator / company owner / driver login).
+ * is_active = false hides/disables the member in the admin UI.
+ */
+export const toggleUserActive = async (id, isActive) => updateUser(id, { is_active: isActive });
 
 export const deleteUser = async (id) => {
     // For permanent deletion, we'd need another edge function or Admin API access

@@ -301,16 +301,30 @@ class _StatCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(data.icon, color: data.color, size: 22),
-          Column(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(data.value,
-                  style: VType.titleLg
-                      .copyWith(color: VColors.contentStrong)),
-              Text(data.label, style: VType.caption),
+              Flexible(
+                child: Text(data.label,
+                    style: VType.caption.copyWith(
+                        color: VColors.contentMuted,
+                        fontWeight: FontWeight.w500)),
+              ),
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: data.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(VRadius.sm),
+                ),
+                child: Icon(data.icon, color: data.color, size: 16),
+              ),
             ],
           ),
+          const SizedBox(height: VSpace.x2),
+          Text(data.value,
+              style: VType.titleLg.copyWith(color: VColors.contentStrong)),
         ],
       ),
     );
@@ -325,28 +339,54 @@ class _ActiveRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: VSpace.x2),
-      padding: const EdgeInsets.all(VSpace.x3),
       decoration: BoxDecoration(
         color: VColors.surface900,
         borderRadius: BorderRadius.circular(VRadius.md),
         border: Border.all(color: VColors.surface700),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(tx.carPlate,
-                    style: VType.body.copyWith(
-                        color: VColors.contentStrong,
-                        fontWeight: FontWeight.w600)),
-                Text(tx.guestName ?? 'Guest', style: VType.caption),
-              ],
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Status-colored left accent bar
+            Container(
+              width: 3,
+              decoration: BoxDecoration(
+                color: tx.status.color,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(VRadius.md),
+                  bottomLeft: Radius.circular(VRadius.md),
+                ),
+              ),
             ),
-          ),
-          _StatusChip(status: tx.status),
-        ],
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: VSpace.x3, vertical: VSpace.x3),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(tx.carPlate,
+                              style: VType.body.copyWith(
+                                  color: VColors.contentStrong,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5)),
+                          const SizedBox(height: 2),
+                          Text(tx.guestName ?? 'Guest',
+                              style: VType.caption),
+                        ],
+                      ),
+                    ),
+                    _StatusChip(status: tx.status),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -403,46 +443,77 @@ class _TxRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(VSpace.x3),
       decoration: BoxDecoration(
         color: VColors.surface900,
-        borderRadius: BorderRadius.circular(VRadius.md),
+        borderRadius: BorderRadius.circular(VRadius.lg),
         border: Border.all(color: VColors.surface700),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Status-colored left accent bar
+            Container(
+              width: 3,
+              decoration: BoxDecoration(
+                color: tx.status.color,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(VRadius.lg),
+                  bottomLeft: Radius.circular(VRadius.lg),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(VSpace.x3),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(tx.carPlate,
-                        style: VType.body.copyWith(
-                            color: VColors.contentStrong,
-                            fontWeight: FontWeight.w600)),
-                    if (tx.keyCode != null) ...[
-                      const SizedBox(width: VSpace.x2),
-                      Text('· ${tx.keyCode}', style: VType.caption),
-                    ],
+                    Row(
+                      children: [
+                        Text(tx.carPlate,
+                            style: VType.body.copyWith(
+                                color: VColors.contentStrong,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5)),
+                        if (tx.keyCode != null) ...[
+                          const SizedBox(width: VSpace.x2),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: VColors.surface700,
+                              borderRadius:
+                                  BorderRadius.circular(VRadius.full),
+                            ),
+                            child: Text('Key ${tx.keyCode}',
+                                style: VType.caption.copyWith(
+                                    color: VColors.contentMuted,
+                                    fontSize: 11)),
+                          ),
+                        ],
+                        const Spacer(),
+                        _StatusChip(status: tx.status),
+                      ],
+                    ),
+                    const SizedBox(height: VSpace.x1),
+                    Text(
+                      [
+                        tx.guestName ?? 'Guest',
+                        if (tx.guestPhone != null) tx.guestPhone!,
+                      ].join('  ·  '),
+                      style: VType.caption,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(_fmtDateTime(tx.createdAt),
+                        style: VType.caption
+                            .copyWith(color: VColors.contentFaint)),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  [
-                    tx.guestName ?? 'Guest',
-                    if (tx.guestPhone != null) tx.guestPhone!,
-                  ].join('  ·  '),
-                  style: VType.caption,
-                ),
-                Text(_fmtDateTime(tx.createdAt),
-                    style: VType.caption
-                        .copyWith(color: VColors.contentFaint)),
-              ],
+              ),
             ),
-          ),
-          _StatusChip(status: tx.status),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -588,93 +659,188 @@ Future<bool?> _confirm(BuildContext context, String title, String body) {
 }
 
 class _PersonRow extends StatelessWidget {
-  const _PersonRow(
-      {required this.user,
-      required this.onEdit,
-      required this.onToggle,
-      required this.onDelete});
+  const _PersonRow({
+    required this.user,
+    required this.onEdit,
+    required this.onToggle,
+    required this.onDelete,
+  });
   final AdminUser user;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
 
+  String get _initials {
+    final name = user.displayName.trim();
+    final parts = name.split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(VSpace.x3, VSpace.x2, VSpace.x1, VSpace.x2),
+    final isActive = user.active;
+    final activeColor = isActive ? VColors.alertSuccess : VColors.contentFaint;
+    final roleName = user.role == 'driver' ? 'Driver' : 'Operator';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
         color: VColors.surface900,
-        borderRadius: BorderRadius.circular(VRadius.md),
-        border: Border.all(color: VColors.surface700),
+        borderRadius: BorderRadius.circular(VRadius.lg),
+        border: Border.all(
+          color: isActive
+              ? VColors.alertSuccess.withValues(alpha: 0.3)
+              : VColors.surface700,
+          width: 1,
+        ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: VColors.brand900,
-            child: Text(
-              (user.name ?? user.email).characters.first.toUpperCase(),
-              style: VType.label.copyWith(color: VColors.brand300),
-            ),
-          ),
-          const SizedBox(width: VSpace.x3),
-          Expanded(
-            child: Column(
+          // ---- Top: avatar, name/email, role chip, ⋮ ----
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                VSpace.x4, VSpace.x4, VSpace.x2, VSpace.x3),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(user.name ?? user.email,
-                    style: VType.body
-                        .copyWith(color: VColors.contentStrong)),
-                Text(user.email, style: VType.caption),
+                // Avatar
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: VColors.brand900,
+                    borderRadius: BorderRadius.circular(VRadius.md),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    _initials,
+                    style: VType.label.copyWith(
+                        color: VColors.brand300, fontSize: 15),
+                  ),
+                ),
+                const SizedBox(width: VSpace.x3),
+                // Name + email
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.displayName,
+                        style:
+                            VType.label.copyWith(color: VColors.contentStrong),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(user.email,
+                          style: VType.caption,
+                          overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                // Role chip
+                Container(
+                  margin: const EdgeInsets.only(left: VSpace.x2, top: 2),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: VColors.brand900,
+                    borderRadius: BorderRadius.circular(VRadius.full),
+                    border: Border.all(
+                        color: VColors.brand400.withValues(alpha: 0.4),
+                        width: 1),
+                  ),
+                  child: Text(roleName,
+                      style: VType.caption.copyWith(
+                          color: VColors.brand300,
+                          fontWeight: FontWeight.w600)),
+                ),
+                // ⋮ actions menu — Edit and Delete only (toggle is inline)
+                PopupMenuButton<String>(
+                  color: VColors.surface800,
+                  icon: Icon(Icons.more_vert_rounded,
+                      color: VColors.contentMuted, size: 20),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(VRadius.md),
+                    side: BorderSide(color: VColors.surface600, width: 1),
+                  ),
+                  onSelected: (v) {
+                    if (v == 'edit') onEdit();
+                    if (v == 'delete') onDelete();
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(children: [
+                        Icon(Icons.edit_outlined,
+                            size: 16, color: VColors.contentMuted),
+                        const SizedBox(width: VSpace.x2),
+                        Text('Edit',
+                            style: VType.body
+                                .copyWith(color: VColors.contentStrong)),
+                      ]),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(children: [
+                        Icon(Icons.delete_outline_rounded,
+                            size: 16, color: VColors.alertDanger),
+                        const SizedBox(width: VSpace.x2),
+                        Text('Delete',
+                            style:
+                                TextStyle(color: VColors.alertDanger)),
+                      ]),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: VSpace.x2, vertical: VSpace.x0),
-            decoration: BoxDecoration(
-              color: (user.active ? VColors.alertSuccess : VColors.contentFaint)
-                  .withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(VRadius.full),
+
+          // ---- Divider ----
+          Divider(height: 1, color: VColors.surface700),
+
+          // ---- Bottom: status dot + label + inline switch ----
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                VSpace.x4, VSpace.x2, VSpace.x3, VSpace.x2),
+            child: Row(
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: activeColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: VSpace.x2),
+                Text(
+                  isActive ? 'Active' : 'Inactive',
+                  style: VType.caption.copyWith(
+                      color: activeColor, fontWeight: FontWeight.w600),
+                ),
+                const Spacer(),
+                Transform.scale(
+                  scale: 0.8,
+                  alignment: Alignment.centerRight,
+                  child: Switch(
+                    value: isActive,
+                    onChanged: (_) => onToggle(),
+                    activeColor: VColors.alertSuccess,
+                  ),
+                ),
+              ],
             ),
-            child: Text(user.active ? 'Active' : 'Inactive',
-                style: VType.caption.copyWith(
-                    color: user.active
-                        ? VColors.alertSuccess
-                        : VColors.contentFaint)),
-          ),
-          PopupMenuButton<String>(
-            color: VColors.surface800,
-            icon: Icon(Icons.more_vert_rounded,
-                color: VColors.contentMuted, size: 20),
-            onSelected: (v) => switch (v) {
-              'edit' => onEdit(),
-              'toggle' => onToggle(),
-              _ => onDelete(),
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'edit',
-                child: Text('Edit',
-                    style: VType.body.copyWith(color: VColors.contentStrong)),
-              ),
-              PopupMenuItem(
-                value: 'toggle',
-                child: Text(user.active ? 'Deactivate' : 'Activate',
-                    style: VType.body.copyWith(color: VColors.contentStrong)),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: Text('Delete',
-                    style: TextStyle(color: VColors.alertDanger)),
-              ),
-            ],
           ),
         ],
       ),
     );
   }
 }
+
 
 // ===========================================================================
 // 4) Locations
@@ -756,48 +922,106 @@ class _LocationRow extends StatelessWidget {
     final addr = [loc.address, loc.city, loc.state]
         .where((p) => p != null && p.isNotEmpty)
         .join(', ');
-    return InkWell(
-      onTap: onOpen,
-      borderRadius: BorderRadius.circular(VRadius.md),
-      child: Container(
-        padding: const EdgeInsets.all(VSpace.x3),
-        decoration: BoxDecoration(
-          color: VColors.surface900,
-          borderRadius: BorderRadius.circular(VRadius.md),
-          border: Border.all(color: VColors.surface700),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.location_on_rounded,
-                color: VColors.brand400, size: 20),
-            const SizedBox(width: VSpace.x3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(loc.name,
-                      style: VType.body
-                          .copyWith(color: VColors.contentStrong)),
-                  if (addr.isNotEmpty)
-                    Text(addr, style: VType.caption),
-                  Text('${loc.keyCapacity} key slots · tap to manage',
-                      style: VType.caption
-                          .copyWith(color: VColors.contentFaint)),
-                ],
+    return Material(
+      color: VColors.surface900,
+      borderRadius: BorderRadius.circular(VRadius.lg),
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(VRadius.lg),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(VRadius.lg),
+            border: Border.all(color: VColors.surface700),
+          ),
+          child: Column(
+            children: [
+              // ---- Top: icon + name + edit ----
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    VSpace.x4, VSpace.x4, VSpace.x2, VSpace.x3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: VColors.brand900,
+                        borderRadius: BorderRadius.circular(VRadius.md),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(Icons.place_rounded,
+                          size: 20, color: VColors.brand300),
+                    ),
+                    const SizedBox(width: VSpace.x3),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(loc.name,
+                              style:
+                                  VType.label.copyWith(color: VColors.contentStrong),
+                              overflow: TextOverflow.ellipsis),
+                          const SizedBox(height: 2),
+                          Text(
+                            addr.isNotEmpty ? addr : 'No address',
+                            style: VType.caption,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Edit location',
+                      onPressed: onEdit,
+                      icon: Icon(Icons.edit_outlined,
+                          color: VColors.contentMuted, size: 18),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            IconButton(
-              tooltip: 'Edit location',
-              onPressed: onEdit,
-              icon: Icon(Icons.edit_outlined,
-                  color: VColors.contentMuted, size: 18),
-            ),
-          ],
+              // ---- Divider ----
+              Divider(height: 1, color: VColors.surface700),
+              // ---- Footer: key capacity + manage link ----
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    VSpace.x4, VSpace.x2, VSpace.x4, VSpace.x2),
+                child: Row(
+                  children: [
+                    Icon(Icons.vpn_key_rounded,
+                        size: 13, color: VColors.contentMuted),
+                    const SizedBox(width: 5),
+                    Text('${loc.keyCapacity} key slots',
+                        style: VType.caption.copyWith(
+                            color: VColors.contentMuted,
+                            fontWeight: FontWeight.w500)),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: VColors.brand900,
+                        borderRadius: BorderRadius.circular(VRadius.full),
+                        border: Border.all(
+                            color: VColors.brand400.withValues(alpha: 0.4),
+                            width: 1),
+                      ),
+                      child: Text('Manage →',
+                          style: VType.caption.copyWith(
+                              color: VColors.brand300,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
+
 
 // ===========================================================================
 // 6) Analytics — driver + location performance, computed from history

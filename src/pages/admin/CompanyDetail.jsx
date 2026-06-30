@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { getLocationsByCompany, deleteLocation } from '../../services/locationService';
 import { getDriversByCompany, deleteDriver, toggleDriverActive, updateDriver } from '../../services/driverService';
-import { getUsersByCompany, deleteUser, updateUser } from '../../services/userService';
+import { getUsersByCompany, deleteUser, updateUser, toggleUserActive } from '../../services/userService';
 import { syncSlotsWithCapacity } from '../../services/slotService';
 import { createLocation } from '../../services/locationService';
 import { createStaff } from '../../services/userService';
@@ -19,7 +19,7 @@ import { toast } from '../../components/ui/Toast';
 import logger from '../../lib/logger';
 import {
     ArrowLeft, Building2, MapPin, Users, Car, Plus, Trash2,
-    Phone, Mail, UserCheck, UserX, Key, Eye, EyeOff, Shield, Edit2
+    Phone, Mail, Key, Eye, EyeOff, Shield, Edit2, ToggleLeft, ToggleRight
 } from 'lucide-react';
 
 const TABS = [
@@ -282,10 +282,24 @@ const OperatorsTab = ({ companyId, operators, locations, onRefresh }) => {
     const [form, setForm] = useState({ name: '', email: '', password: '', location_id: '' });
     const [showPwd, setShowPwd] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [togglingId, setTogglingId] = useState(null);
 
     const [editModal, setEditModal] = useState(false);
     const [editForm, setEditForm] = useState({ id: null, name: '', location_id: '' });
     const [savingEdit, setSavingEdit] = useState(false);
+
+    const handleToggleOperator = async (o) => {
+        setTogglingId(o.id);
+        try {
+            await toggleUserActive(o.id, !o.is_active);
+            toast.success(o.is_active ? `${o.name || 'Operator'} disabled` : `${o.name || 'Operator'} enabled`);
+            onRefresh();
+        } catch (err) {
+            toast.error(err?.message || 'Failed to update status');
+        } finally {
+            setTogglingId(null);
+        }
+    };
 
     const startEdit = (o) => {
         setEditForm({ id: o.id, name: o.name || '', location_id: o.location_id || '' });
@@ -364,27 +378,65 @@ const OperatorsTab = ({ companyId, operators, locations, onRefresh }) => {
                                 <th className="px-5 py-2 font-medium">Name</th>
                                 <th className="px-5 py-2 font-medium">Email</th>
                                 <th className="px-5 py-2 font-medium">Location</th>
+                                <th className="px-5 py-2 font-medium">Status</th>
                                 <th className="px-5 py-2 font-medium text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {operators.map(o => (
-                                <tr key={o.id} className="hover:bg-white/[0.02]">
-                                    <td className="px-5 py-3 text-white">{o.name || 'N/A'}</td>
-                                    <td className="px-5 py-3 text-gray-400 text-xs"><span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" />{o.email}</span></td>
-                                    <td className="px-5 py-3 text-gray-400 text-xs">{o.location?.name || <span className="text-gray-600">—</span>}</td>
-                                    <td className="px-5 py-3 text-right">
-                                        <div className="flex justify-end gap-1">
-                                            <button onClick={() => startEdit(o)} aria-label="Edit operator" className="p-1.5 rounded-lg hover:bg-white/5 text-gray-600 hover:text-white transition-colors">
-                                                <Edit2 className="h-4 w-4" />
-                                            </button>
-                                            <button onClick={() => handleDelete(o)} aria-label="Remove operator" className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors">
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {operators.map(o => {
+                                const isActive = o.is_active !== false;
+                                const isToggling = togglingId === o.id;
+                                return (
+                                    <tr key={o.id} className={`hover:bg-white/[0.02] transition-opacity ${!isActive ? 'opacity-60' : ''}`}>
+                                        <td className="px-5 py-3 text-white">{o.name || 'N/A'}</td>
+                                        <td className="px-5 py-3 text-gray-400 text-xs"><span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" />{o.email}</span></td>
+                                        <td className="px-5 py-3 text-gray-400 text-xs">{o.location?.name || <span className="text-gray-600">—</span>}</td>
+                                        <td className="px-5 py-3">
+                                            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                                                isActive
+                                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                                    : 'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                                            }`}>
+                                                <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-400' : 'bg-gray-500'}`} />
+                                                {isActive ? 'Active' : 'Disabled'}
+                                            </span>
+                                        </td>
+                                        <td className="px-5 py-3 text-right">
+                                            <div className="flex justify-end gap-1">
+                                                <button
+                                                    onClick={() => startEdit(o)}
+                                                    aria-label="Edit operator"
+                                                    className="p-1.5 rounded-lg hover:bg-white/5 text-gray-600 hover:text-white transition-colors"
+                                                >
+                                                    <Edit2 className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleToggleOperator(o)}
+                                                    disabled={isToggling}
+                                                    aria-label={isActive ? 'Disable operator' : 'Enable operator'}
+                                                    title={isActive ? 'Disable' : 'Enable'}
+                                                    className={`p-1.5 rounded-lg transition-colors ${
+                                                        isActive
+                                                            ? 'hover:bg-orange-500/10 text-gray-600 hover:text-orange-400'
+                                                            : 'hover:bg-emerald-500/10 text-gray-600 hover:text-emerald-400'
+                                                    } ${isToggling ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                >
+                                                    {isActive
+                                                        ? <ToggleRight className="h-4 w-4" />
+                                                        : <ToggleLeft className="h-4 w-4" />}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(o)}
+                                                    aria-label="Remove operator"
+                                                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400 transition-colors"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </Card>
@@ -562,7 +614,7 @@ const DriversTab = ({ companyId, drivers, locations, onRefresh }) => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {drivers.map(d => (
-                        <Card key={d.id} className="p-4">
+                        <Card key={d.id} className={`p-4 transition-opacity ${!d.active ? 'opacity-60' : ''}`}>
                             <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-3 min-w-0">
                                     <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${d.active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gray-500/10 text-gray-500'}`}>
@@ -571,15 +623,34 @@ const DriversTab = ({ companyId, drivers, locations, onRefresh }) => {
                                     <div className="min-w-0">
                                         <p className="font-medium text-white text-sm truncate">{d.name}</p>
                                         <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5"><Phone className="h-3 w-3" />{d.phone || 'N/A'}</p>
-                                        {d.user_id && <p className="text-[10px] text-emerald-400/80 flex items-center gap-1 mt-0.5"><Key className="h-3 w-3" />Login enabled</p>}
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
+                                                d.active
+                                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                                    : 'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                                            }`}>
+                                                <span className={`h-1.5 w-1.5 rounded-full ${d.active ? 'bg-emerald-400' : 'bg-gray-500'}`} />
+                                                {d.active ? 'Active' : 'Disabled'}
+                                            </span>
+                                            {d.user_id && <span className="text-[10px] text-emerald-400/80 flex items-center gap-1"><Key className="h-3 w-3" />Login</span>}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
                                     <button onClick={() => startEdit(d)} aria-label="Edit driver" className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white" title="Edit">
                                         <Edit2 className="h-3.5 w-3.5" />
                                     </button>
-                                    <button onClick={() => handleToggle(d)} className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white" title={d.active ? 'Deactivate' : 'Activate'}>
-                                        {d.active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                                    <button
+                                        onClick={() => handleToggle(d)}
+                                        aria-label={d.active ? 'Disable driver' : 'Enable driver'}
+                                        title={d.active ? 'Disable' : 'Enable'}
+                                        className={`p-1.5 rounded-lg transition-colors ${
+                                            d.active
+                                                ? 'hover:bg-orange-500/10 text-gray-500 hover:text-orange-400'
+                                                : 'hover:bg-emerald-500/10 text-gray-500 hover:text-emerald-400'
+                                        }`}
+                                    >
+                                        {d.active ? <ToggleRight className="h-3.5 w-3.5" /> : <ToggleLeft className="h-3.5 w-3.5" />}
                                     </button>
                                     <button onClick={() => handleDelete(d)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-600 hover:text-red-400" title="Delete">
                                         <Trash2 className="h-3.5 w-3.5" />
