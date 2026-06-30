@@ -83,19 +83,20 @@ class _HelpChatbotState extends ConsumerState<HelpChatbot> {
     final panelW = size.width - 40 < 380.0 ? size.width - 40 : 380.0;
     final panelH = size.height - 160 < 520.0 ? size.height - 160 : 520.0;
 
-    // Anchored bottom-LEFT so it never collides with a screen's bottom-right
-    // "+ New" FAB (operator floor, company/admin lists, etc.).
+    // Anchored bottom-RIGHT above the "+ New" FAB (operator floor, company/admin
+    // lists, etc. all put their primary FAB at Flutter's default bottom-right 16px
+    // margin; our 88px bottom clears a 56px extended FAB with a gap).
     return Stack(
       children: [
         if (_open)
           Positioned(
-            left: 20,
-            bottom: 92,
+            right: 20,
+            bottom: 156,
             child: _panel(panelW, panelH),
           ),
         Positioned(
-          left: 20,
-          bottom: 24,
+          right: 20,
+          bottom: 88,
           child: FloatingActionButton(
             heroTag: 'help_assistant_fab',
             backgroundColor: VColors.brand500,

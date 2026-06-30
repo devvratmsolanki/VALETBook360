@@ -49,6 +49,9 @@ class _OperatorCreateSheetState extends ConsumerState<OperatorCreateSheet> {
   /// selection label, and tells [_ensureSelection] not to silently re-pick.
   bool _manualPick = false;
 
+  /// Whether the full slot picker grid is expanded (operator wants to override).
+  bool _slotPickerExpanded = false;
+
   @override
   void dispose() {
     _plate.dispose();
@@ -244,8 +247,8 @@ class _OperatorCreateSheetState extends ConsumerState<OperatorCreateSheet> {
         ],
       );
 
-  /// The "Key slot" picker: a label + a wrap of slot boxes. Free slots are
-  /// tappable, occupied are greyed/disabled, the selection is brand-filled.
+  /// Key slot section: auto-assigns the first free slot silently, shows it as
+  /// a badge. A "Change" button expands the full picker grid for overrides.
   Widget _keySlotSection(
     AsyncValue<OperatorKeySlots> slotsAsync,
     Set<String> occupied,
@@ -257,12 +260,7 @@ class _OperatorCreateSheetState extends ConsumerState<OperatorCreateSheet> {
         children: [
           Padding(
             padding: const EdgeInsets.only(left: VSpace.x1, bottom: VSpace.x2),
-            child: Text(
-              _selectedSlot == null
-                  ? 'Key slot'
-                  : 'Key slot · $_selectedSlot${_manualPick ? '' : ' (auto)'}',
-              style: VType.caption,
-            ),
+            child: Text('Key slot', style: VType.caption),
           ),
           slotsAsync.when(
             loading: () => const Padding(
@@ -278,21 +276,80 @@ class _OperatorCreateSheetState extends ConsumerState<OperatorCreateSheet> {
             ),
             data: (pool) {
               if (pool.slots.isEmpty) {
-                return Text(
-                  'No key slots configured for this location.',
-                  style: VType.caption,
-                );
+                return Text('No key slots configured for this location.',
+                    style: VType.caption);
               }
-              return Wrap(
-                spacing: VSpace.x2,
-                runSpacing: VSpace.x2,
+              final free = pool.slots.where((s) => !occupied.contains(s)).toList();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final slot in pool.slots)
-                    _slotBox(
-                      slot,
-                      occupied: occupied.contains(slot),
-                      selected: slot == _selectedSlot,
+                  // Auto-assigned badge row
+                  Row(
+                    children: [
+                      if (_selectedSlot != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: VSpace.x3, vertical: VSpace.x2),
+                          decoration: BoxDecoration(
+                            color: VColors.brand500,
+                            borderRadius: BorderRadius.circular(VRadius.md),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.vpn_key_rounded,
+                                  size: 14, color: VColors.contentOnAccent),
+                              const SizedBox(width: VSpace.x1),
+                              Text(_selectedSlot!,
+                                  style: VType.label
+                                      .copyWith(color: VColors.contentOnAccent)),
+                              if (!_manualPick) ...[
+                                const SizedBox(width: VSpace.x2),
+                                Text('auto',
+                                    style: VType.caption.copyWith(
+                                        color: VColors.contentOnAccent
+                                            .withValues(alpha: 0.75))),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ] else ...[
+                        Text(
+                          free.isEmpty ? 'No free slots' : 'Assigning…',
+                          style: VType.caption,
+                        ),
+                      ],
+                      const SizedBox(width: VSpace.x3),
+                      if (free.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => setState(
+                              () => _slotPickerExpanded = !_slotPickerExpanded),
+                          child: Text(
+                            _slotPickerExpanded ? 'Hide' : 'Change',
+                            style: VType.caption.copyWith(
+                                color: VColors.brand400,
+                                decoration: TextDecoration.underline,
+                                decorationColor: VColors.brand400),
+                          ),
+                        ),
+                    ],
+                  ),
+                  // Expandable full grid for manual override
+                  if (_slotPickerExpanded) ...[
+                    const SizedBox(height: VSpace.x3),
+                    Wrap(
+                      spacing: VSpace.x2,
+                      runSpacing: VSpace.x2,
+                      children: [
+                        for (final slot in pool.slots)
+                          _slotBox(
+                            slot,
+                            occupied: occupied.contains(slot),
+                            selected: slot == _selectedSlot,
+                          ),
+                      ],
                     ),
+                  ],
                 ],
               );
             },
