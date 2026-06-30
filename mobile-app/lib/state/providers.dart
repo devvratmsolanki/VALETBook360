@@ -224,3 +224,7 @@ final companyRollupsProvider =
       ),
   };
 });
+
+/// Chatbot FAB bottom offset — screens with a NavigationBar set this to
+/// navBar + FAB height + margins so the chatbot clears the FAB above the bar.
+final chatbotBottomOffsetProvider = StateProvider<double>((ref) => 88.0);

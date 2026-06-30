@@ -52,90 +52,223 @@ class CompanyHomeScreen extends ConsumerWidget {
   }
 }
 
-class _CompanyShell extends ConsumerWidget {
+class _CompanyShell extends ConsumerStatefulWidget {
   const _CompanyShell({required this.companyId});
   final String companyId;
 
-  static const _tabs = [
-    Tab(text: 'Dashboard'),
-    Tab(text: 'Transactions'),
-    Tab(text: 'Drivers'),
-    Tab(text: 'Locations'),
-    Tab(text: 'Team'),
-    Tab(text: 'Analytics'),
-    Tab(text: 'Contracts'),
+  @override
+  ConsumerState<_CompanyShell> createState() => _CompanyShellState();
+}
+
+class _CompanyShellState extends ConsumerState<_CompanyShell> {
+  int _index = 0;
+
+  static const _titles = [
+    'Dashboard',
+    'Transactions',
+    'Staff',
+    'Locations',
+    'More',
   ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final detail = ref.watch(companyDetailControllerProvider(companyId));
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(chatbotBottomOffsetProvider.notifier).state = 168.0;
+    });
+  }
+
+  @override
+  void dispose() {
+    ref.read(chatbotBottomOffsetProvider.notifier).state = 88.0;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final detail = ref.watch(companyDetailControllerProvider(widget.companyId));
     final companyName = detail.company?.companyName ?? 'My Company';
 
-    return DefaultTabController(
-      length: _tabs.length,
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: VColors.surface950,
+      appBar: AppBar(
         backgroundColor: VColors.surface950,
-        appBar: AppBar(
-          backgroundColor: VColors.surface950,
-          elevation: 0,
-          titleSpacing: 0,
-          leadingWidth: 116,
-          leading: const Padding(
-            padding: EdgeInsets.only(left: VSpace.x4),
-            child: Align(alignment: Alignment.centerLeft, child: AppLogo()),
-          ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(companyName,
-                  style: VType.title.copyWith(color: VColors.contentStrong)),
-              Text('Company panel', style: VType.caption),
-            ],
-          ),
-          actions: [
-            const ThemeToggleButton(),
-            IconButton(
-              tooltip: 'Refresh',
-              icon: Icon(Icons.refresh_rounded,
-                  color: VColors.contentMuted),
-              onPressed: () {
-                ref.invalidate(companyHistoryProvider);
-                ref
-                    .read(companyDetailControllerProvider(companyId).notifier)
-                    .load();
-              },
-            ),
-            IconButton(
-              tooltip: 'Sign out',
-              icon: Icon(Icons.logout_rounded,
-                  color: VColors.contentMuted),
-              onPressed: () =>
-                  ref.read(authControllerProvider.notifier).logout(),
-            ),
-          ],
-          bottom: TabBar(
-            isScrollable: true,
-            indicatorColor: VColors.brand400,
-            labelColor: VColors.contentStrong,
-            unselectedLabelColor: VColors.contentMuted,
-            labelStyle: VType.label,
-            tabAlignment: TabAlignment.start,
-            tabs: _tabs,
-          ),
+        elevation: 0,
+        titleSpacing: 0,
+        leadingWidth: 116,
+        leading: const Padding(
+          padding: EdgeInsets.only(left: VSpace.x4),
+          child: Align(alignment: Alignment.centerLeft, child: AppLogo()),
         ),
-        body: TabBarView(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _DashboardTab(companyId: companyId),
+            Text(companyName,
+                style: VType.title.copyWith(color: VColors.contentStrong)),
+            Text(_titles[_index], style: VType.caption),
+          ],
+        ),
+        actions: [
+          const ThemeToggleButton(),
+          IconButton(
+            tooltip: 'Refresh',
+            icon: Icon(Icons.refresh_rounded, color: VColors.contentMuted),
+            onPressed: () {
+              ref.invalidate(companyHistoryProvider);
+              ref
+                  .read(companyDetailControllerProvider(widget.companyId).notifier)
+                  .load();
+            },
+          ),
+          IconButton(
+            tooltip: 'Sign out',
+            icon: Icon(Icons.logout_rounded, color: VColors.contentMuted),
+            onPressed: () =>
+                ref.read(authControllerProvider.notifier).logout(),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: IndexedStack(
+          index: _index,
+          children: [
+            _DashboardTab(companyId: widget.companyId),
             const _TransactionsTab(),
-            _DriversTab(companyId: companyId),
-            _LocationsTab(companyId: companyId),
-            _TeamTab(companyId: companyId),
-            _AnalyticsTab(companyId: companyId),
-            _ContractsTab(companyId: companyId),
+            _StaffPane(companyId: widget.companyId),
+            _LocationsTab(companyId: widget.companyId),
+            _MorePane(companyId: widget.companyId),
           ],
         ),
       ),
+      bottomNavigationBar: NavigationBar(
+        backgroundColor: VColors.surface900,
+        indicatorColor: VColors.brand900,
+        selectedIndex: _index,
+        height: VTarget.navBar,
+        onDestinationSelected: (i) => setState(() => _index = i),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard_rounded),
+            label: 'Dashboard',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long_rounded),
+            label: 'Transactions',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline_rounded),
+            selectedIcon: Icon(Icons.people_rounded),
+            label: 'Staff',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.place_outlined),
+            selectedIcon: Icon(Icons.place_rounded),
+            label: 'Locations',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.more_horiz_rounded),
+            selectedIcon: Icon(Icons.more_horiz_rounded),
+            label: 'More',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Staff pane — Drivers and Team (operators) with a toggle. Combines the old
+/// Drivers + Team top tabs into one bottom-nav destination.
+class _StaffPane extends ConsumerStatefulWidget {
+  const _StaffPane({required this.companyId});
+  final String companyId;
+
+  @override
+  ConsumerState<_StaffPane> createState() => _StaffPaneState();
+}
+
+class _StaffPaneState extends ConsumerState<_StaffPane> {
+  bool _showDrivers = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              VSpace.x4, VSpace.x4, VSpace.x4, 0),
+          child: Row(
+            children: [
+              _SubTab(
+                label: 'Drivers',
+                selected: _showDrivers,
+                onTap: () => setState(() => _showDrivers = true),
+              ),
+              const SizedBox(width: VSpace.x2),
+              _SubTab(
+                label: 'Team',
+                selected: !_showDrivers,
+                onTap: () => setState(() => _showDrivers = false),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _PeopleList(
+            companyId: widget.companyId,
+            isDriver: _showDrivers,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// More pane — Analytics and Contracts with a toggle.
+class _MorePane extends ConsumerStatefulWidget {
+  const _MorePane({required this.companyId});
+  final String companyId;
+
+  @override
+  ConsumerState<_MorePane> createState() => _MorePaneState();
+}
+
+class _MorePaneState extends ConsumerState<_MorePane> {
+  bool _showAnalytics = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              VSpace.x4, VSpace.x4, VSpace.x4, 0),
+          child: Row(
+            children: [
+              _SubTab(
+                label: 'Analytics',
+                selected: _showAnalytics,
+                onTap: () => setState(() => _showAnalytics = true),
+              ),
+              const SizedBox(width: VSpace.x2),
+              _SubTab(
+                label: 'Contracts',
+                selected: !_showAnalytics,
+                onTap: () => setState(() => _showAnalytics = false),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _showAnalytics
+              ? _AnalyticsTab(companyId: widget.companyId)
+              : _ContractsTab(companyId: widget.companyId),
+        ),
+      ],
     );
   }
 }
@@ -227,18 +360,21 @@ class _DashboardTab extends ConsumerWidget {
             ? 0
             : ((delivered.length / all.length) * 100).round();
 
-        // Avg retrieval time (requested → delivered), minutes.
+        // Avg retrieval time (requested → delivered).
         String avgRetrieval = '—';
         final timed = delivered
             .where((t) => t.requestedAt != null && t.deliveredAt != null)
             .toList();
         if (timed.isNotEmpty) {
-          final totalMins = timed.fold<int>(
+          final totalSecs = timed.fold<int>(
               0,
               (sum, t) =>
                   sum +
-                  t.deliveredAt!.difference(t.requestedAt!).inMinutes.abs());
-          avgRetrieval = '${(totalMins / timed.length).round()} min';
+                  t.deliveredAt!.difference(t.requestedAt!).inSeconds.abs());
+          final avgSecs = totalSecs / timed.length;
+          avgRetrieval = avgSecs < 60
+              ? '< 1 min'
+              : '${(avgSecs / 60).round()} min';
         }
 
         // Active cars grouped by location, busiest first.
@@ -414,8 +550,8 @@ class _WeekBarChart extends StatelessWidget {
     final maxVal = counts.fold(0, (m, v) => v > m ? v : m);
 
     return Container(
-      height: 110,
-      padding: const EdgeInsets.fromLTRB(VSpace.x4, VSpace.x3, VSpace.x4, VSpace.x2),
+      height: 128,
+      padding: const EdgeInsets.fromLTRB(VSpace.x4, VSpace.x4, VSpace.x4, VSpace.x3),
       decoration: BoxDecoration(
         color: VColors.surface900,
         borderRadius: BorderRadius.circular(VRadius.lg),
@@ -431,8 +567,8 @@ class _WeekBarChart extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 3),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Count label when > 0
                   if (counts[i] > 0)
                     Text('${counts[i]}',
                         style: VType.caption.copyWith(
@@ -441,11 +577,10 @@ class _WeekBarChart extends StatelessWidget {
                                 ? VColors.brand300
                                 : VColors.contentFaint)),
                   const SizedBox(height: 2),
-                  // Bar
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 400),
                     curve: Curves.easeOut,
-                    height: 54 * frac + (frac > 0 ? 4 : 0),
+                    height: 52 * frac + (frac > 0 ? 4 : 0),
                     decoration: BoxDecoration(
                       color: isToday
                           ? VColors.brand400
@@ -454,7 +589,6 @@ class _WeekBarChart extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // Day label
                   Text(labels[i],
                       style: VType.caption.copyWith(
                           fontSize: 10,
@@ -824,24 +958,6 @@ class _TxRow extends StatelessWidget {
 // ===========================================================================
 // 3) Drivers / 5) Team — both reuse the company-detail people slice
 // ===========================================================================
-
-class _DriversTab extends ConsumerWidget {
-  const _DriversTab({required this.companyId});
-  final String companyId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      _PeopleList(companyId: companyId, isDriver: true);
-}
-
-class _TeamTab extends ConsumerWidget {
-  const _TeamTab({required this.companyId});
-  final String companyId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      _PeopleList(companyId: companyId, isDriver: false);
-}
 
 class _PeopleList extends ConsumerWidget {
   const _PeopleList({required this.companyId, required this.isDriver});

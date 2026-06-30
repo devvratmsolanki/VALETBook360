@@ -93,6 +93,21 @@ class _AdminShellState extends ConsumerState<_AdminShell> {
   static const _titles = ['Dashboard', 'Companies', 'All Locations', 'All Users'];
 
   @override
+  void initState() {
+    super.initState();
+    // navBar(80) + FAB margin(16) + extended FAB height(56) + gap(16) = 168
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(chatbotBottomOffsetProvider.notifier).state = 168.0;
+    });
+  }
+
+  @override
+  void dispose() {
+    ref.read(chatbotBottomOffsetProvider.notifier).state = 88.0;
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     const panes = [
       _AdminDashboardPane(),
