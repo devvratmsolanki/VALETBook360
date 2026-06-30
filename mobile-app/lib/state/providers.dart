@@ -185,3 +185,42 @@ final adminUsersControllerProvider =
     StateNotifierProvider<AdminUsersController, AdminUsersState>((ref) {
   return AdminUsersController(client: ref.watch(apiClientProvider));
 });
+
+/// Per-company rollup counts for the super-admin hierarchical dashboard:
+/// locations, operators (DB role `valet`), and drivers per company. One pair of
+/// admin fetches (all locations + all users), grouped client-side — no
+/// per-company round trips. Keyed by company id.
+///
+/// ponytail: counts only — a live active-car badge per company would need a
+/// cross-tenant admin transactions endpoint (none exists; OperatorController is
+/// JWT-companyId scoped). Add that endpoint if live counts are wanted.
+typedef CompanyRollup = ({int locations, int operators, int drivers});
+
+final companyRollupsProvider =
+    FutureProvider.autoDispose<Map<String, CompanyRollup>>((ref) async {
+  final api = ref.watch(apiClientProvider);
+  final (locs, users) = await (api.fetchAllLocations(), api.fetchAllUsers()).wait;
+  final loc = <String, int>{};
+  for (final l in locs) {
+    loc[l.companyId] = (loc[l.companyId] ?? 0) + 1;
+  }
+  final op = <String, int>{};
+  final drv = <String, int>{};
+  for (final u in users) {
+    final cid = u.companyId;
+    if (cid == null) continue;
+    if (u.role == 'driver') {
+      drv[cid] = (drv[cid] ?? 0) + 1;
+    } else if (u.role == 'valet') {
+      op[cid] = (op[cid] ?? 0) + 1;
+    }
+  }
+  return {
+    for (final id in {...loc.keys, ...op.keys, ...drv.keys})
+      id: (
+        locations: loc[id] ?? 0,
+        operators: op[id] ?? 0,
+        drivers: drv[id] ?? 0,
+      ),
+  };
+});

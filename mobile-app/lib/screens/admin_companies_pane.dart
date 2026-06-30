@@ -24,6 +24,9 @@ class AdminCompaniesPane extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(companiesControllerProvider);
     final notifier = ref.read(companiesControllerProvider.notifier);
+    // Per-company hierarchy counts (locations/operators/drivers). null while the
+    // single admin rollup fetch is in flight — cards just render without counts.
+    final rollups = ref.watch(companyRollupsProvider).valueOrNull;
 
     return Scaffold(
       backgroundColor: VColors.surface950,
@@ -36,7 +39,7 @@ class AdminCompaniesPane extends ConsumerWidget {
             style: VType.label.copyWith(color: VColors.contentOnAccent)),
         onPressed: () => _create(context),
       ),
-      body: _body(context, state, notifier),
+      body: _body(context, state, notifier, rollups),
     );
   }
 
@@ -58,6 +61,7 @@ class AdminCompaniesPane extends ConsumerWidget {
     BuildContext context,
     CompaniesState state,
     CompaniesController notifier,
+    Map<String, CompanyRollup>? rollups,
   ) {
     Future<void> deleteCompany(Company c) async {
       final ok = await showDialog<bool>(
@@ -150,7 +154,10 @@ class AdminCompaniesPane extends ConsumerWidget {
                   runSpacing: VSpace.x3,
                   children: [
                     for (final c in state.companies)
-                      _CompanyCard(company: c, onDelete: () => deleteCompany(c)),
+                      _CompanyCard(
+                          company: c,
+                          rollup: rollups?[c.id],
+                          onDelete: () => deleteCompany(c)),
                   ],
                 ),
               ),
@@ -162,8 +169,9 @@ class AdminCompaniesPane extends ConsumerWidget {
 }
 
 class _CompanyCard extends StatelessWidget {
-  const _CompanyCard({required this.company, this.onDelete});
+  const _CompanyCard({required this.company, this.rollup, this.onDelete});
   final Company company;
+  final CompanyRollup? rollup;
   final VoidCallback? onDelete;
 
   String get _initials {
@@ -171,6 +179,17 @@ class _CompanyCard extends StatelessWidget {
     final parts = name.split(RegExp(r'\s+'));
     return parts.isNotEmpty ? parts.first[0].toUpperCase() : 'C';
   }
+
+  Widget _stat(IconData icon, int n, String label) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: VColors.contentFaint),
+          const SizedBox(width: 4),
+          Text('$n $label',
+              style: VType.caption
+                  .copyWith(color: VColors.contentFaint, fontSize: 11)),
+        ],
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -252,16 +271,27 @@ class _CompanyCard extends StatelessWidget {
                     VSpace.x4, VSpace.x2, VSpace.x4, VSpace.x2),
                 child: Row(
                   children: [
-                    Icon(Icons.location_on_outlined,
-                        size: 13, color: VColors.contentFaint),
-                    const SizedBox(width: 4),
+                    // Hierarchy counts at a glance (locations → operators →
+                    // drivers); falls back to the email until the rollup loads.
                     Expanded(
-                      child: Text(
-                        company.email ?? 'No email',
-                        style: VType.caption.copyWith(
-                            color: VColors.contentFaint, fontSize: 11),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      child: rollup == null
+                          ? Text(
+                              company.email ?? 'No email',
+                              style: VType.caption.copyWith(
+                                  color: VColors.contentFaint, fontSize: 11),
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          : Wrap(
+                              spacing: VSpace.x3,
+                              children: [
+                                _stat(Icons.location_on_outlined,
+                                    rollup!.locations, 'loc'),
+                                _stat(Icons.badge_outlined,
+                                    rollup!.operators, 'op'),
+                                _stat(Icons.directions_car_outlined,
+                                    rollup!.drivers, 'drv'),
+                              ],
+                            ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(

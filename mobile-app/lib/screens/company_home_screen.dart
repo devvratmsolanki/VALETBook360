@@ -126,7 +126,7 @@ class _CompanyShell extends ConsumerWidget {
         ),
         body: TabBarView(
           children: [
-            const _DashboardTab(),
+            _DashboardTab(companyId: companyId),
             const _TransactionsTab(),
             _DriversTab(companyId: companyId),
             _LocationsTab(companyId: companyId),
@@ -201,11 +201,17 @@ class _StatusChip extends StatelessWidget {
 // ===========================================================================
 
 class _DashboardTab extends ConsumerWidget {
-  const _DashboardTab();
+  const _DashboardTab({required this.companyId});
+  final String companyId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(companyHistoryProvider);
+    // Location names for the live "Active by Location" breakdown.
+    final locNames = {
+      for (final l in ref.watch(companyDetailControllerProvider(companyId)).locations)
+        l.id: l.name,
+    };
     return history.when(
       loading: _loading,
       error: (e, _) =>
@@ -217,6 +223,15 @@ class _DashboardTab extends ConsumerWidget {
             .where((t) => t.status == LifecycleStatus.requested)
             .length;
         final today = all.where((t) => _isToday(t.createdAt)).length;
+
+        // Active cars grouped by location, busiest first.
+        final byLoc = <String, int>{};
+        for (final t in active) {
+          final name = locNames[t.locationId] ?? 'Unassigned';
+          byLoc[name] = (byLoc[name] ?? 0) + 1;
+        }
+        final byLocSorted = byLoc.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
 
         final stats = [
           _StatCardData('Active Cars', active.length.toString(),
@@ -250,6 +265,20 @@ class _DashboardTab extends ConsumerWidget {
                     context.responsive(compact: 1.7, expanded: 2.0, large: 2.2),
                 children: [for (final s in stats) _StatCard(data: s)],
               ),
+              if (byLocSorted.isNotEmpty) ...[
+                const SizedBox(height: VSpace.x6),
+                Text('Active by Location',
+                    style: VType.label.copyWith(color: VColors.contentStrong)),
+                const SizedBox(height: VSpace.x2),
+                Wrap(
+                  spacing: VSpace.x2,
+                  runSpacing: VSpace.x2,
+                  children: [
+                    for (final e in byLocSorted)
+                      _LocationActiveChip(name: e.key, count: e.value),
+                  ],
+                ),
+              ],
               const SizedBox(height: VSpace.x6),
               Text('Active Vehicles',
                   style:
@@ -325,6 +354,52 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: VSpace.x2),
           Text(data.value,
               style: VType.titleLg.copyWith(color: VColors.contentStrong)),
+        ],
+      ),
+    );
+  }
+}
+
+/// A live active-cars-by-location pill. The pulsing dot mirrors the web
+/// dashboard's "live" affordance.
+class _LocationActiveChip extends StatelessWidget {
+  const _LocationActiveChip({required this.name, required this.count});
+  final String name;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(horizontal: VSpace.x3, vertical: VSpace.x2),
+      decoration: BoxDecoration(
+        color: VColors.surface900,
+        borderRadius: BorderRadius.circular(VRadius.full),
+        border: Border.all(color: VColors.surface700),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration:
+                BoxDecoration(color: VColors.brand400, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: VSpace.x2),
+          Text(name,
+              style: VType.caption.copyWith(color: VColors.contentStrong)),
+          const SizedBox(width: VSpace.x2),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+            decoration: BoxDecoration(
+              color: VColors.brand900,
+              borderRadius: BorderRadius.circular(VRadius.full),
+            ),
+            child: Text('$count',
+                style: VType.caption.copyWith(
+                    color: VColors.brand300, fontWeight: FontWeight.w700)),
+          ),
         ],
       ),
     );
