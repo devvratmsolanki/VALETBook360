@@ -27,7 +27,7 @@ class AdminCompanyDetailScreen extends ConsumerWidget {
         ref.read(companyDetailControllerProvider(companyId).notifier);
 
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         backgroundColor: VColors.surface950,
         appBar: AppBar(
@@ -78,6 +78,7 @@ class AdminCompanyDetailScreen extends ConsumerWidget {
               Tab(text: 'Locations'),
               Tab(text: 'Operators'),
               Tab(text: 'Drivers'),
+              Tab(text: 'Facility Owners'),
             ],
           ),
         ),
@@ -115,6 +116,8 @@ class AdminCompanyDetailScreen extends ConsumerWidget {
             _LocationsTab(companyId: companyId, state: state),
             _PeopleTab(companyId: companyId, state: state, role: 'valet'),
             _PeopleTab(companyId: companyId, state: state, role: 'driver'),
+            _PeopleTab(
+                companyId: companyId, state: state, role: 'facility_owner'),
           ],
         );
     }
@@ -141,6 +144,7 @@ class _OverviewTab extends StatelessWidget {
             _Stat('Locations', state.locations.length),
             _Stat('Operators', state.operators.length),
             _Stat('Drivers', state.drivers.length),
+            _Stat('Facility Owners', state.facilityOwners.length),
           ]),
           const SizedBox(height: VSpace.x5),
           _SectionLabel('Company Info'),
@@ -216,6 +220,12 @@ class _LocationsTab extends ConsumerWidget {
             separatorBuilder: (_, __) => const SizedBox(height: VSpace.x3),
             itemBuilder: (_, i) {
               final loc = state.locations[i];
+              final ownerName = loc.facilityOwnerId == null
+                  ? null
+                  : state.facilityOwners
+                      .where((u) => u.id == loc.facilityOwnerId)
+                      .map((u) => u.displayName)
+                      .firstOrNull;
               return _Tile(
                 leading: Icons.place_rounded,
                 title: loc.name,
@@ -239,7 +249,8 @@ class _LocationsTab extends ConsumerWidget {
                     ),
                   ],
                 ),
-                badge: '${loc.keyCapacity} keys',
+                badgeWidget: _LocationBadges(
+                    keyCount: loc.keyCapacity, ownerName: ownerName),
               );
             },
           ),
@@ -263,7 +274,7 @@ class _PeopleTab extends ConsumerStatefulWidget {
 
   final String companyId;
   final CompanyDetailState state;
-  final String role; // 'valet' or 'driver'
+  final String role; // 'valet' | 'driver' | 'facility_owner'
 
   @override
   ConsumerState<_PeopleTab> createState() => _PeopleTabState();
@@ -278,11 +289,7 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
   Future<void> _toggle(AdminUser u) async {
     if (_toggling.contains(u.id)) return;
     setState(() => _toggling.add(u.id));
-    final ok = await _notifier.setUserActive(
-      u.id,
-      !u.active,
-      isDriver: widget.role == 'driver',
-    );
+    final ok = await _notifier.setUserActive(u.id, !u.active, role: widget.role);
     if (mounted) {
       setState(() => _toggling.remove(u.id));
       if (!ok && _notifier.createError != null) {
@@ -294,7 +301,7 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
   Future<void> _delete(AdminUser u) async {
     final confirmed = await _confirmDelete(context, u.displayName);
     if (confirmed != true || !mounted) return;
-    final ok = await _notifier.deleteUser(u.id, isDriver: widget.role == 'driver');
+    final ok = await _notifier.deleteUser(u.id, role: widget.role);
     if (!ok && mounted && _notifier.createError != null) {
       _snack(context, _notifier.createError!);
     }
@@ -302,9 +309,16 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
 
   @override
   Widget build(BuildContext context) {
-    final isDriver = widget.role == 'driver';
-    final people = isDriver ? widget.state.drivers : widget.state.operators;
-    final noun = isDriver ? 'driver' : 'operator';
+    final people = widget.role == 'driver'
+        ? widget.state.drivers
+        : widget.role == 'facility_owner'
+            ? widget.state.facilityOwners
+            : widget.state.operators;
+    final noun = widget.role == 'driver'
+        ? 'driver'
+        : widget.role == 'facility_owner'
+            ? 'facility owner'
+            : 'operator';
 
     Future<void> add() => AdminStaffSheet.show(
           context,
@@ -326,7 +340,11 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
 
     if (people.isEmpty) {
       return _EmptyTab(
-        icon: isDriver ? Icons.person_off_outlined : Icons.badge_outlined,
+        icon: widget.role == 'driver'
+            ? Icons.person_off_outlined
+            : widget.role == 'facility_owner'
+                ? Icons.domain_disabled_outlined
+                : Icons.badge_outlined,
         headline: 'No ${noun}s yet',
         hint: 'Add a $noun login to get this company moving.',
         actionLabel: 'Add $noun',
@@ -396,7 +414,11 @@ class _MemberCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isActive = user.active;
     final activeColor = isActive ? VColors.alertSuccess : VColors.contentFaint;
-    final roleName = user.role == 'driver' ? 'Driver' : 'Operator';
+    final roleName = user.role == 'driver'
+        ? 'Driver'
+        : user.role == 'facility_owner'
+            ? 'Facility Owner'
+            : 'Operator';
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -557,6 +579,52 @@ class _MemberCard extends StatelessWidget {
 }
 
 // ===========================================================================
+// _LocationBadges — key count + optional facility owner chip
+// ===========================================================================
+
+class _LocationBadges extends StatelessWidget {
+  const _LocationBadges({required this.keyCount, this.ownerName});
+  final int keyCount;
+  final String? ownerName;
+
+  Widget _chip(String label, Color fg, Color bg, Color border) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: VSpace.x2, vertical: 2),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(VRadius.full),
+          border: Border.all(color: border, width: 1),
+        ),
+        child: Text(label,
+            style: VType.caption
+                .copyWith(color: fg, fontWeight: FontWeight.w600)),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _chip(
+          '$keyCount keys',
+          VColors.brand300,
+          VColors.brand300.withValues(alpha: 0.14),
+          VColors.brand300.withValues(alpha: 0.4),
+        ),
+        if (ownerName != null) ...[
+          const SizedBox(width: VSpace.x1),
+          _chip(
+            ownerName!,
+            VColors.contentMuted,
+            VColors.surface700.withValues(alpha: 0.5),
+            VColors.surface600,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ===========================================================================
 // Helpers
 // ===========================================================================
 
@@ -712,8 +780,6 @@ class _Tile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.trailing,
-    this.badge,
-    this.badgeColor,
     this.badgeWidget,
   });
 
@@ -721,13 +787,10 @@ class _Tile extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget? trailing;
-  final String? badge;
-  final Color? badgeColor;
   final Widget? badgeWidget;
 
   @override
   Widget build(BuildContext context) {
-    final resolvedBadgeColor = badgeColor ?? VColors.brand300;
     return Container(
       constraints: const BoxConstraints(minHeight: VTarget.minTouch),
       padding: const EdgeInsets.symmetric(
@@ -757,22 +820,6 @@ class _Tile extends StatelessWidget {
           if (badgeWidget != null) ...[
             const SizedBox(width: VSpace.x2),
             badgeWidget!,
-          ] else if (badge != null) ...[
-            const SizedBox(width: VSpace.x2),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: VSpace.x2, vertical: 2),
-              decoration: BoxDecoration(
-                color: resolvedBadgeColor.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(VRadius.full),
-                border: Border.all(
-                    color: resolvedBadgeColor.withValues(alpha: 0.4), width: 1),
-              ),
-              child: Text(badge!,
-                  style: VType.caption.copyWith(
-                      color: resolvedBadgeColor,
-                      fontWeight: FontWeight.w600)),
-            ),
           ],
           if (trailing != null) trailing!,
         ],

@@ -256,6 +256,7 @@ class _CompanyCardState extends State<_CompanyCard> {
     final owners = widget.users.where((u) => u.isManager).toList();
     final operators = widget.users.where((u) => u.isOperator).toList();
     final drivers = widget.users.where((u) => u.isDriver).toList();
+    final facilityOwners = widget.users.where((u) => u.isFacilityOwner).toList();
     final active = widget.users.where((u) => u.active).length;
 
     return Container(
@@ -340,6 +341,7 @@ class _CompanyCardState extends State<_CompanyCard> {
                   _bucket('Owner', Icons.manage_accounts_rounded, owners),
                   _bucket('Operators', Icons.badge_rounded, operators),
                   _bucket('Drivers', Icons.person_pin_circle_rounded, drivers),
+                  _bucket('Facility Owners', Icons.domain_rounded, facilityOwners),
                 ],
               ),
             ),

@@ -219,17 +219,23 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
     }
   }
 
+  Future<void> _refreshForRole(String role) async {
+    if (role == 'driver') {
+      await _refreshDrivers();
+    } else if (role == 'facility_owner') {
+      await _refreshFacilityOwners();
+    } else {
+      await _refreshOperators();
+    }
+  }
+
   /// Activate/deactivate a staff account.
   Future<bool> setUserActive(String userId, bool active,
-      {required bool isDriver}) async {
+      {required String role}) async {
     createError = null;
     try {
       await _client.setUserActive(userId, active);
-      if (isDriver) {
-        await _refreshDrivers();
-      } else {
-        await _refreshOperators();
-      }
+      await _refreshForRole(role);
       return true;
     } on ApiException catch (e) {
       createError = e.message;
@@ -241,15 +247,11 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
   }
 
   /// Delete a staff account.
-  Future<bool> deleteUser(String userId, {required bool isDriver}) async {
+  Future<bool> deleteUser(String userId, {required String role}) async {
     createError = null;
     try {
       await _client.deleteUser(userId);
-      if (isDriver) {
-        await _refreshDrivers();
-      } else {
-        await _refreshOperators();
-      }
+      await _refreshForRole(role);
       return true;
     } on ApiException catch (e) {
       createError = e.message;

@@ -1160,8 +1160,9 @@ class _PeopleList extends ConsumerWidget {
       );
     }
 
+    final role = isDriver ? 'driver' : 'valet';
     Future<void> toggle(AdminUser u) async {
-      final ok = await notifier.setUserActive(u.id, !u.active, isDriver: isDriver);
+      final ok = await notifier.setUserActive(u.id, !u.active, role: role);
       if (!ok && context.mounted) {
         _snack(context, notifier.createError ?? 'Could not update the account.');
       }
@@ -1171,7 +1172,7 @@ class _PeopleList extends ConsumerWidget {
       final confirmed = await _confirm(context,
           'Delete ${u.name ?? u.email}?', 'This removes their login. This cannot be undone.');
       if (confirmed != true) return;
-      final ok = await notifier.deleteUser(u.id, isDriver: isDriver);
+      final ok = await notifier.deleteUser(u.id, role: role);
       if (!ok && context.mounted) {
         _snack(context, notifier.createError ?? 'Could not delete the account.');
       }
@@ -1467,8 +1468,15 @@ class _LocationsTab extends ConsumerWidget {
         separatorBuilder: (_, __) => const SizedBox(height: VSpace.x2),
         itemBuilder: (_, i) {
           final loc = state.locations[i];
+          final ownerName = loc.facilityOwnerId == null
+              ? null
+              : state.facilityOwners
+                  .where((u) => u.id == loc.facilityOwnerId)
+                  .map((u) => u.displayName)
+                  .firstOrNull;
           return _LocationRow(
             loc: loc,
+            facilityOwnerName: ownerName,
             onEdit: () => edit(loc),
             onOpen: () => Navigator.of(context).push(
               MaterialPageRoute(
@@ -1482,11 +1490,16 @@ class _LocationsTab extends ConsumerWidget {
 }
 
 class _LocationRow extends StatelessWidget {
-  const _LocationRow(
-      {required this.loc, required this.onEdit, required this.onOpen});
+  const _LocationRow({
+    required this.loc,
+    required this.onEdit,
+    required this.onOpen,
+    this.facilityOwnerName,
+  });
   final AdminLocation loc;
   final VoidCallback onEdit;
   final VoidCallback onOpen;
+  final String? facilityOwnerName;
 
   @override
   Widget build(BuildContext context) {
@@ -1566,6 +1579,32 @@ class _LocationRow extends StatelessWidget {
                         style: VType.caption.copyWith(
                             color: VColors.contentMuted,
                             fontWeight: FontWeight.w500)),
+                    if (facilityOwnerName != null) ...[
+                      const SizedBox(width: VSpace.x2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: VColors.surface700,
+                          borderRadius: BorderRadius.circular(VRadius.full),
+                          border: Border.all(
+                              color: VColors.surface600, width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.domain_rounded,
+                                size: 10, color: VColors.contentFaint),
+                            const SizedBox(width: 3),
+                            Text(facilityOwnerName!,
+                                style: VType.caption.copyWith(
+                                    color: VColors.contentMuted,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
+                    ],
                     const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -1707,7 +1746,7 @@ class _FacilityOwnersList extends ConsumerWidget {
       final confirmed = await _confirm(context, 'Delete ${u.name ?? u.email}?',
           'This removes their login. This cannot be undone.');
       if (confirmed != true) return;
-      final ok = await notifier.deleteUser(u.id, isDriver: false);
+      final ok = await notifier.deleteUser(u.id, role: 'facility_owner');
       if (!ok && context.mounted) {
         _snack(context,
             notifier.createError ?? 'Could not delete the account.');
@@ -1727,7 +1766,7 @@ class _FacilityOwnersList extends ConsumerWidget {
           onToggle: () async {
             final ok = await notifier.setUserActive(
                 people[i].id, !people[i].active,
-                isDriver: false);
+                role: 'facility_owner');
             if (!ok && context.mounted) {
               _snack(context,
                   notifier.createError ?? 'Could not update the account.');

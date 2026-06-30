@@ -45,6 +45,7 @@ class AdminUser {
   bool get isManager => role == 'manager';
   bool get isOperator => role == 'valet';
   bool get isDriver => role == 'driver';
+  bool get isFacilityOwner => role == 'facility_owner';
 
   String get displayName =>
       (name != null && name!.trim().isNotEmpty) ? name!.trim() : email;

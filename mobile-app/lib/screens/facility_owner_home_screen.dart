@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/admin_location.dart';
-import '../state/auth_controller.dart';
 import '../state/providers.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
