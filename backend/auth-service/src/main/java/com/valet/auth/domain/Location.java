@@ -42,6 +42,9 @@ public class Location {
     @Column(name = "key_capacity", nullable = false)
     private int keyCapacity;
 
+    @Column(name = "facility_owner_id")
+    private UUID facilityOwnerId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -122,6 +125,14 @@ public class Location {
 
     public void setKeyCapacity(int keyCapacity) {
         this.keyCapacity = keyCapacity;
+    }
+
+    public UUID getFacilityOwnerId() {
+        return facilityOwnerId;
+    }
+
+    public void setFacilityOwnerId(UUID facilityOwnerId) {
+        this.facilityOwnerId = facilityOwnerId;
     }
 
     public Instant getCreatedAt() {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'screens/admin_home_screen.dart';
 import 'screens/company_home_screen.dart';
+import 'screens/facility_owner_home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/mission_stack_screen.dart';
 import 'screens/operator_floor_screen.dart';
@@ -38,6 +39,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (loc == '/operator' && !auth.user!.isOperator) return home;
       if (loc == '/admin' && !auth.user!.isAdmin) return home;
       if (loc == '/company' && !auth.user!.isManager) return home;
+      if (loc == '/facility-owner' && !auth.user!.isFacilityOwner) return home;
       return null;
     },
     routes: [
@@ -60,6 +62,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/company',
         builder: (context, state) => const CompanyHomeScreen(),
+      ),
+      GoRoute(
+        path: '/facility-owner',
+        builder: (context, state) => const FacilityOwnerHomeScreen(),
       ),
     ],
   );

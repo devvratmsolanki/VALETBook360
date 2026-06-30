@@ -238,7 +238,7 @@ class _MorePane extends ConsumerStatefulWidget {
 }
 
 class _MorePaneState extends ConsumerState<_MorePane> {
-  bool _showAnalytics = true;
+  int _tab = 0; // 0=Analytics 1=Contracts 2=Facility Owners
 
   @override
   Widget build(BuildContext context) {
@@ -247,26 +247,37 @@ class _MorePaneState extends ConsumerState<_MorePane> {
         Padding(
           padding: const EdgeInsets.fromLTRB(
               VSpace.x4, VSpace.x4, VSpace.x4, 0),
-          child: Row(
-            children: [
-              _SubTab(
-                label: 'Analytics',
-                selected: _showAnalytics,
-                onTap: () => setState(() => _showAnalytics = true),
-              ),
-              const SizedBox(width: VSpace.x2),
-              _SubTab(
-                label: 'Contracts',
-                selected: !_showAnalytics,
-                onTap: () => setState(() => _showAnalytics = false),
-              ),
-            ],
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _SubTab(
+                  label: 'Analytics',
+                  selected: _tab == 0,
+                  onTap: () => setState(() => _tab = 0),
+                ),
+                const SizedBox(width: VSpace.x2),
+                _SubTab(
+                  label: 'Contracts',
+                  selected: _tab == 1,
+                  onTap: () => setState(() => _tab = 1),
+                ),
+                const SizedBox(width: VSpace.x2),
+                _SubTab(
+                  label: 'Facility Owners',
+                  selected: _tab == 2,
+                  onTap: () => setState(() => _tab = 2),
+                ),
+              ],
+            ),
           ),
         ),
         Expanded(
-          child: _showAnalytics
+          child: _tab == 0
               ? _AnalyticsTab(companyId: widget.companyId)
-              : _ContractsTab(companyId: widget.companyId),
+              : _tab == 1
+                  ? _ContractsTab(companyId: widget.companyId)
+                  : _FacilityOwnersList(companyId: widget.companyId),
         ),
       ],
     );
@@ -1634,6 +1645,95 @@ class _AnalyticsTabState extends ConsumerState<_AnalyticsTab> {
           ],
         );
       },
+    );
+  }
+}
+
+// ===========================================================================
+// Facility Owners list (More pane → Facility Owners sub-tab)
+// ===========================================================================
+
+class _FacilityOwnersList extends ConsumerWidget {
+  const _FacilityOwnersList({required this.companyId});
+  final String companyId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(companyDetailControllerProvider(companyId));
+    final notifier =
+        ref.read(companyDetailControllerProvider(companyId).notifier);
+
+    Future<void> add() => AdminStaffSheet.show(
+          context,
+          role: 'facility_owner',
+          locations: state.locations,
+          onSubmit: notifier.addStaff,
+          errorReader: () => notifier.createError,
+        );
+
+    Future<void> edit(AdminUser u) => AdminStaffSheet.show(
+          context,
+          role: u.role,
+          locations: state.locations,
+          existing: u,
+          onSubmit: notifier.addStaff,
+          onUpdate: (input) => notifier.updateStaff(u.id, input),
+          errorReader: () => notifier.createError,
+        );
+
+    if (state.status == DetailStatus.loading) return _loading();
+    if (state.status == DetailStatus.error) {
+      return _error('Could not load facility owners.', notifier.load);
+    }
+
+    final people = state.facilityOwners;
+    if (people.isEmpty) {
+      return _AddScaffold(
+        label: 'Add facility owner',
+        onAdd: add,
+        child: VEmptyState(
+          icon: Icons.domain_outlined,
+          headline: 'No facility owners yet',
+          hint: 'Create a facility owner login to give view access to specific locations.',
+          actionLabel: 'Add facility owner',
+          onAction: add,
+        ),
+      );
+    }
+
+    Future<void> remove(AdminUser u) async {
+      final confirmed = await _confirm(context, 'Delete ${u.name ?? u.email}?',
+          'This removes their login. This cannot be undone.');
+      if (confirmed != true) return;
+      final ok = await notifier.deleteUser(u.id, isDriver: false);
+      if (!ok && context.mounted) {
+        _snack(context,
+            notifier.createError ?? 'Could not delete the account.');
+      }
+    }
+
+    return _AddScaffold(
+      label: 'Add facility owner',
+      onAdd: add,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(VSpace.x4),
+        itemCount: people.length,
+        separatorBuilder: (_, __) => const SizedBox(height: VSpace.x2),
+        itemBuilder: (_, i) => _PersonRow(
+          user: people[i],
+          onEdit: () => edit(people[i]),
+          onToggle: () async {
+            final ok = await notifier.setUserActive(
+                people[i].id, !people[i].active,
+                isDriver: false);
+            if (!ok && context.mounted) {
+              _snack(context,
+                  notifier.createError ?? 'Could not update the account.');
+            }
+          },
+          onDelete: () => remove(people[i]),
+        ),
+      ),
     );
   }
 }

@@ -9,6 +9,7 @@ import java.util.UUID;
  * Location projection. {@code companyName} is populated only for the admin
  * "all locations across all companies" view (grouped display); it is null on
  * the per-company endpoints where the company is already the context.
+ * {@code facilityOwnerId} is the user-id of the assigned facility owner, or null.
  */
 public record LocationResponse(
         UUID id,
@@ -20,6 +21,7 @@ public record LocationResponse(
         String state,
         String country,
         int keyCapacity,
+        UUID facilityOwnerId,
         Instant createdAt
 ) {
     public static LocationResponse from(Location l) {
@@ -37,6 +39,7 @@ public record LocationResponse(
                 l.getState(),
                 l.getCountry(),
                 l.getKeyCapacity(),
+                l.getFacilityOwnerId(),
                 l.getCreatedAt()
         );
     }

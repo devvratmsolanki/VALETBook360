@@ -87,7 +87,11 @@ class _AdminStaffSheetState extends ConsumerState<AdminStaffSheet> {
 
   bool get _isDriver => widget.role == 'driver';
   bool get _isEdit => widget.existing != null;
-  String get _roleNoun => _isDriver ? 'driver' : 'operator';
+  String get _roleNoun {
+    if (widget.role == 'driver') return 'driver';
+    if (widget.role == 'facility_owner') return 'facility owner';
+    return 'operator';
+  }
 
   @override
   void initState() {
@@ -226,7 +230,9 @@ class _AdminStaffSheetState extends ConsumerState<AdminStaffSheet> {
               label: _isEdit ? 'Save' : 'Add $_roleNoun',
               icon: _isDriver
                   ? Icons.person_pin_circle_rounded
-                  : Icons.badge_rounded,
+                  : widget.role == 'facility_owner'
+                      ? Icons.domain_rounded
+                      : Icons.badge_rounded,
               loading: _busy,
               onPressed: _busy ? null : _submit,
             ),

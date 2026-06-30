@@ -26,7 +26,9 @@ class AuthUser {
 
   /// The valid DB role vocabulary. A user whose role is missing or outside this
   /// set is NOT silently treated as a driver — the auth layer rejects it.
-  static const Set<String> knownRoles = {'admin', 'manager', 'valet', 'driver'};
+  static const Set<String> knownRoles = {
+    'admin', 'manager', 'valet', 'driver', 'facility_owner'
+  };
 
   /// Whether [role] is one the router knows how to home. Callers (login /
   /// session-restore) must reject a user for which this is false rather than
@@ -66,6 +68,7 @@ class AuthUser {
       };
 
   bool get isDriver => role == 'driver';
+  bool get isFacilityOwner => role == 'facility_owner';
 
   /// Super admin — sees every company (no company scope of its own).
   bool get isAdmin => role == 'admin';
@@ -84,9 +87,10 @@ class AuthUser {
 
   /// Home route for this role, used by the post-login redirect.
   ///   admin → /admin · manager (company owner) → /company ·
-  ///   valet → /operator · driver → /driver
+  ///   valet → /operator · driver → /driver · facility_owner → /facility-owner
   String get homeRoute {
     if (isDriver) return '/driver';
+    if (isFacilityOwner) return '/facility-owner';
     if (isManager) return '/company';
     if (isAdmin) return '/admin';
     return '/operator';

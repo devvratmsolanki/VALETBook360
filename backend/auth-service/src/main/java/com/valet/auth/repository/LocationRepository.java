@@ -18,4 +18,7 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
 
     /** Paged: every location across every company (admin "all locations" view). */
     Page<Location> findAllByOrderByNameAsc(Pageable pageable);
+
+    /** Locations assigned to a specific facility owner (their panel view). */
+    List<Location> findByFacilityOwnerIdOrderByNameAsc(UUID facilityOwnerId);
 }

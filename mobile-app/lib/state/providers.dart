@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
 import '../api/realtime_client.dart';
 import '../api/token_store.dart';
+import '../models/admin_location.dart';
 import '../models/contract.dart';
 import '../models/key_slot.dart';
 import '../models/operator_key_slots.dart';
@@ -228,3 +229,10 @@ final companyRollupsProvider =
 /// Chatbot FAB bottom offset — screens with a NavigationBar set this to
 /// navBar + FAB height + margins so the chatbot clears the FAB above the bar.
 final chatbotBottomOffsetProvider = StateProvider<double>((ref) => 88.0);
+
+/// Locations visible to the calling facility owner (their own panel).
+/// autoDispose so it refetches when the panel is reopened.
+final facilityOwnerLocationsProvider =
+    FutureProvider.autoDispose<List<AdminLocation>>((ref) async {
+  return ref.watch(apiClientProvider).fetchFacilityOwnerLocations();
+});

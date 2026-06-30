@@ -619,6 +619,22 @@ class ApiClient {
     }
   }
 
+  // ---- FACILITY OWNER (self-service, AUTH service) ----
+
+  /// GET /api/facility-owner/locations — locations where facility_owner_id = me.
+  Future<List<AdminLocation>> fetchFacilityOwnerLocations() async {
+    try {
+      final res = await _auth.get(ApiConfig.facilityOwnerLocationsPath);
+      _ensureOk(res);
+      return _asList(res.data)
+          .whereType<Map<String, dynamic>>()
+          .map(AdminLocation.fromJson)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   // ---- CORE (authed) ----
 
   /// GET /api/driver/assignments

@@ -23,7 +23,8 @@ public enum Role {
     ADMIN,
     MANAGER,
     VALET,
-    DRIVER;
+    DRIVER,
+    FACILITY_OWNER;
 
     /** Lowercase wire/DB value (the shared contract form). */
     @JsonValue

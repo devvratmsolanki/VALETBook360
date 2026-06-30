@@ -273,8 +273,23 @@ public class CompanyAdminService {
         loc.setState(trimToNull(req.state()));
         loc.setCountry(trimToNull(req.country()));
         loc.setKeyCapacity(req.keyCapacity());
+        loc.setFacilityOwnerId(req.facilityOwnerId());
         locations.save(loc);
         return LocationResponse.from(loc);
+    }
+
+    /**
+     * Locations visible to the calling facility owner (by their user-id).
+     * Admin and manager callers get all locations for their scope instead —
+     * this method is intended for the {@code /api/facility-owner/locations}
+     * self-service endpoint but is safe to call from tests with any principal.
+     */
+    @Transactional(readOnly = true)
+    public List<LocationResponse> listFacilityOwnerLocations(AuthPrincipal caller) {
+        return locations.findByFacilityOwnerIdOrderByNameAsc(caller.userId())
+                .stream()
+                .map(LocationResponse::from)
+                .toList();
     }
 
     /**

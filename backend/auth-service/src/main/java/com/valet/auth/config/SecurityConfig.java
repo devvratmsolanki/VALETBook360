@@ -70,6 +70,10 @@ public class SecurityConfig {
                         // the coarse first gate so a valet/driver token never even
                         // reaches the handler — mirrors the operator-fix pattern.)
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // Facility owner self-service: read their own locations.
+                        // Admin + manager can also call it (for testing).
+                        .requestMatchers("/api/facility-owner/**")
+                                .hasAnyRole("ADMIN", "MANAGER", "FACILITY_OWNER")
                         // Tenant management (companies + locations): ADMIN or MANAGER.
                         // Per-tenant scoping (a manager only their own company) and
                         // the admin-only POST /api/companies are enforced in-service.

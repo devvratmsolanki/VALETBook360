@@ -148,4 +148,7 @@ class ApiConfig {
   // Admin-only flat listings for the hierarchy views.
   static const String adminLocationsPath = '/api/admin/locations';
   static const String adminUsersPath = '/api/admin/users';
+
+  // Facility owner self-service.
+  static const String facilityOwnerLocationsPath = '/api/facility-owner/locations';
 }

@@ -9,8 +9,8 @@ import '../models/company.dart';
 enum DetailStatus { loading, ready, error }
 
 /// State for one company's drill-down (`CompanyDetail.jsx` re-platform): the
-/// overview plus the Locations / Operators / Drivers tabs. Each collection
-/// loads in one pass; create actions refetch the affected slice.
+/// overview plus the Locations / Operators / Drivers / FacilityOwners tabs.
+/// Each collection loads in one pass; create actions refetch the affected slice.
 @immutable
 class CompanyDetailState {
   const CompanyDetailState({
@@ -19,6 +19,7 @@ class CompanyDetailState {
     this.locations = const [],
     this.operators = const [],
     this.drivers = const [],
+    this.facilityOwners = const [],
     this.error,
   });
 
@@ -31,6 +32,10 @@ class CompanyDetailState {
 
   /// `driver` users.
   final List<AdminUser> drivers;
+
+  /// `facility_owner` users.
+  final List<AdminUser> facilityOwners;
+
   final String? error;
 
   CompanyDetailState copyWith({
@@ -39,6 +44,7 @@ class CompanyDetailState {
     List<AdminLocation>? locations,
     List<AdminUser>? operators,
     List<AdminUser>? drivers,
+    List<AdminUser>? facilityOwners,
     String? error,
     bool clearError = false,
   }) {
@@ -48,15 +54,14 @@ class CompanyDetailState {
       locations: locations ?? this.locations,
       operators: operators ?? this.operators,
       drivers: drivers ?? this.drivers,
+      facilityOwners: facilityOwners ?? this.facilityOwners,
       error: clearError ? null : (error ?? this.error),
     );
   }
 }
 
-/// Drill-down controller for a single company. Loads the overview + all three
-/// people/location collections, and exposes create actions for each. Mirrors
-/// the FloorController shape: a status enum, optimistic-or-refetch creates, and
-/// a `createError` slot the forms read on failure.
+/// Drill-down controller for a single company. Loads the overview + all four
+/// people/location collections, and exposes create actions for each.
 class CompanyDetailController extends StateNotifier<CompanyDetailState> {
   CompanyDetailController({required ApiClient client, required this.companyId})
       : _client = client,
@@ -67,7 +72,7 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
   final ApiClient _client;
   final String companyId;
 
-  /// Last create-action error (location/operator/driver), surfaced in the form.
+  /// Last create-action error, surfaced in the form.
   String? createError;
 
   Future<void> load() async {
@@ -78,6 +83,7 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
         _client.fetchCompanyLocations(companyId),
         _client.fetchCompanyUsers(companyId, role: 'valet'),
         _client.fetchCompanyUsers(companyId, role: 'driver'),
+        _client.fetchCompanyUsers(companyId, role: 'facility_owner'),
       ]);
       state = CompanyDetailState(
         status: DetailStatus.ready,
@@ -85,9 +91,10 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
         locations: results[1] as List<AdminLocation>,
         operators: results[2] as List<AdminUser>,
         drivers: results[3] as List<AdminUser>,
+        facilityOwners: results[4] as List<AdminUser>,
       );
     } on ApiException catch (e) {
-      if (e.isUnauthorized) return; // global 401 bounce owns it.
+      if (e.isUnauthorized) return;
       state = state.copyWith(status: DetailStatus.error, error: e.message);
     } catch (_) {
       state = state.copyWith(
@@ -111,6 +118,12 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
   Future<void> _refreshDrivers() async {
     final drivers = await _client.fetchCompanyUsers(companyId, role: 'driver');
     state = state.copyWith(drivers: drivers);
+  }
+
+  Future<void> _refreshFacilityOwners() async {
+    final facilityOwners =
+        await _client.fetchCompanyUsers(companyId, role: 'facility_owner');
+    state = state.copyWith(facilityOwners: facilityOwners);
   }
 
   /// Add a location. Returns true on success; false + [createError] on failure.
@@ -148,8 +161,7 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
     }
   }
 
-  /// Delete a location (server cascades its key slots and unassigns pinned
-  /// users), then refresh the locations slice. Returns true on success.
+  /// Delete a location.
   Future<bool> deleteLocation(String locationId) async {
     createError = null;
     try {
@@ -165,13 +177,15 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
     }
   }
 
-  /// Add a staff member (`valet` operator or `driver`) and refresh that slice.
+  /// Add a staff member and refresh the appropriate slice.
   Future<bool> addStaff(CreateStaffInput input) async {
     createError = null;
     try {
       await _client.createStaff(companyId, input);
       if (input.role == 'driver') {
         await _refreshDrivers();
+      } else if (input.role == 'facility_owner') {
+        await _refreshFacilityOwners();
       } else {
         await _refreshOperators();
       }
@@ -185,14 +199,16 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
     }
   }
 
-  /// Edit a staff member (`valet` operator or `driver`). The role may flip
-  /// between valet/driver, so refresh both people slices. Returns true on
-  /// success; false + [createError] on failure.
+  /// Edit a staff member. Refreshes all people slices since role may change.
   Future<bool> updateStaff(String userId, UpdateStaffInput input) async {
     createError = null;
     try {
       await _client.updateStaff(userId, input);
-      await Future.wait([_refreshOperators(), _refreshDrivers()]);
+      await Future.wait([
+        _refreshOperators(),
+        _refreshDrivers(),
+        _refreshFacilityOwners(),
+      ]);
       return true;
     } on ApiException catch (e) {
       createError = e.message;
@@ -203,9 +219,9 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
     }
   }
 
-  /// Activate/deactivate a staff (operator/driver) account and refresh both
-  /// people slices (the user could be in either). Returns true on success.
-  Future<bool> setUserActive(String userId, bool active, {required bool isDriver}) async {
+  /// Activate/deactivate a staff account.
+  Future<bool> setUserActive(String userId, bool active,
+      {required bool isDriver}) async {
     createError = null;
     try {
       await _client.setUserActive(userId, active);
@@ -224,7 +240,7 @@ class CompanyDetailController extends StateNotifier<CompanyDetailState> {
     }
   }
 
-  /// Delete a staff (operator/driver) account and refresh that slice.
+  /// Delete a staff account.
   Future<bool> deleteUser(String userId, {required bool isDriver}) async {
     createError = null;
     try {

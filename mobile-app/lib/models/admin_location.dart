@@ -3,8 +3,8 @@
 /// Re-platforms `src/pages/admin/AdminLocations.jsx` + the Locations tab of
 /// `CompanyDetail.jsx`. Contract `LocationResponse`:
 /// `{ id, companyId, companyName, name, address, city, state, country,
-///    keyCapacity, createdAt }`. `companyName` is populated on the admin flat
-/// listing and null on the per-company nested listing.
+///    keyCapacity, facilityOwnerId, createdAt }`. `companyName` is populated on
+/// the admin flat listing and null on the per-company nested listing.
 class AdminLocation {
   const AdminLocation({
     required this.id,
@@ -16,6 +16,7 @@ class AdminLocation {
     this.state,
     this.country,
     this.keyCapacity = 0,
+    this.facilityOwnerId,
     this.createdAt,
   });
 
@@ -28,6 +29,7 @@ class AdminLocation {
   final String? state;
   final String? country;
   final int keyCapacity;
+  final String? facilityOwnerId;
   final String? createdAt;
 
   factory AdminLocation.fromJson(Map<String, dynamic> json) {
@@ -41,6 +43,7 @@ class AdminLocation {
       state: _nullable(json['state']),
       country: _nullable(json['country']),
       keyCapacity: _asInt(json['keyCapacity']),
+      facilityOwnerId: _nullable(json['facilityOwnerId']),
       createdAt: _nullable(json['createdAt']),
     );
   }
@@ -80,6 +83,7 @@ class CreateLocationInput {
     this.state,
     this.country,
     this.keyCapacity = 0,
+    this.facilityOwnerId,
   });
 
   final String name;
@@ -88,6 +92,7 @@ class CreateLocationInput {
   final String? state;
   final String? country;
   final int keyCapacity;
+  final String? facilityOwnerId;
 
   Map<String, dynamic> toJson() {
     String? trimOrNull(String? v) {
@@ -102,6 +107,8 @@ class CreateLocationInput {
       if (trimOrNull(state) != null) 'state': trimOrNull(state),
       if (trimOrNull(country) != null) 'country': trimOrNull(country),
       'keyCapacity': keyCapacity,
+      // null clears the assignment; omit only when the field was never set.
+      'facilityOwnerId': facilityOwnerId,
     };
   }
 }
