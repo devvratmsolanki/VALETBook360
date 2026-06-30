@@ -211,6 +211,20 @@ class _AdminDashboardPane extends ConsumerWidget {
         return sb.compareTo(sa);
       });
 
+    // Analytics data.
+    final activeUsers = users.users.where((u) => u.active).length;
+    final inactiveUsers = users.users.length - activeUsers;
+    final totalStaff = activeUsers + inactiveUsers;
+    final avgLoc = totalCompanies > 0
+        ? (totalLocations / totalCompanies)
+        : 0.0;
+    final avgOp = totalCompanies > 0
+        ? (totalOperators / totalCompanies)
+        : 0.0;
+    final avgDrv = totalCompanies > 0
+        ? (totalDrivers / totalCompanies)
+        : 0.0;
+
     final kpis = [
       _KpiData('Companies', totalCompanies, Icons.business_rounded, VColors.brand400),
       _KpiData('Locations', totalLocations, Icons.place_rounded, VColors.alertSuccess),
@@ -296,6 +310,23 @@ class _AdminDashboardPane extends ConsumerWidget {
                     rollup: rollupsMap[c.id],
                     rank: sorted.indexOf(c) + 1,
                   ),
+              ],
+
+              // Analytics
+              if (totalStaff > 0) ...[
+                const SizedBox(height: VSpace.x6),
+                Text('Analytics',
+                    style: VType.label
+                        .copyWith(color: VColors.contentStrong)),
+                const SizedBox(height: VSpace.x3),
+                _AdminAnalyticsCard(
+                  activeUsers: activeUsers,
+                  inactiveUsers: inactiveUsers,
+                  totalStaff: totalStaff,
+                  avgLoc: avgLoc,
+                  avgOp: avgOp,
+                  avgDrv: avgDrv,
+                ),
               ],
             ],
           ),
@@ -533,6 +564,180 @@ class _MiniStat extends StatelessWidget {
             style:
                 VType.caption.copyWith(color: VColors.contentDefault)),
       ],
+    );
+  }
+}
+
+class _AdminAnalyticsCard extends StatelessWidget {
+  const _AdminAnalyticsCard({
+    required this.activeUsers,
+    required this.inactiveUsers,
+    required this.totalStaff,
+    required this.avgLoc,
+    required this.avgOp,
+    required this.avgDrv,
+  });
+  final int activeUsers;
+  final int inactiveUsers;
+  final int totalStaff;
+  final double avgLoc;
+  final double avgOp;
+  final double avgDrv;
+
+  @override
+  Widget build(BuildContext context) {
+    String fmt(double v) => v == v.truncateToDouble()
+        ? v.toInt().toString()
+        : v.toStringAsFixed(1);
+
+    return Column(
+      children: [
+        // User status
+        Container(
+          padding: const EdgeInsets.all(VSpace.x4),
+          decoration: BoxDecoration(
+            color: VColors.surface900,
+            borderRadius: BorderRadius.circular(VRadius.lg),
+            border: Border.all(color: VColors.surface700),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('User status',
+                  style: VType.label
+                      .copyWith(color: VColors.contentStrong)),
+              const SizedBox(height: VSpace.x4),
+              _AdminHBarRow(
+                  label: 'Active',
+                  value: activeUsers,
+                  maxVal: totalStaff,
+                  color: VColors.alertSuccess),
+              _AdminHBarRow(
+                  label: 'Inactive',
+                  value: inactiveUsers,
+                  maxVal: totalStaff,
+                  color: VColors.alertDanger),
+            ],
+          ),
+        ),
+        const SizedBox(height: VSpace.x3),
+        // Platform averages
+        Container(
+          padding: const EdgeInsets.all(VSpace.x4),
+          decoration: BoxDecoration(
+            color: VColors.surface900,
+            borderRadius: BorderRadius.circular(VRadius.lg),
+            border: Border.all(color: VColors.surface700),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Platform averages per company',
+                  style: VType.label
+                      .copyWith(color: VColors.contentStrong)),
+              const SizedBox(height: VSpace.x4),
+              _AvgRow(
+                  icon: Icons.place_rounded,
+                  label: 'Locations',
+                  value: fmt(avgLoc)),
+              _AvgRow(
+                  icon: Icons.badge_rounded,
+                  label: 'Operators',
+                  value: fmt(avgOp)),
+              _AvgRow(
+                  icon: Icons.drive_eta_rounded,
+                  label: 'Drivers',
+                  value: fmt(avgDrv)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AdminHBarRow extends StatelessWidget {
+  const _AdminHBarRow(
+      {required this.label,
+      required this.value,
+      required this.maxVal,
+      required this.color});
+  final String label;
+  final int value;
+  final int maxVal;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final frac = maxVal > 0 ? (value / maxVal).clamp(0.0, 1.0) : 0.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: VSpace.x3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(label,
+                    style: VType.caption
+                        .copyWith(color: VColors.contentDefault)),
+              ),
+              Text('$value',
+                  style: VType.caption.copyWith(
+                      color: VColors.contentStrong,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 5),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(VRadius.full),
+            child: LinearProgressIndicator(
+              value: frac,
+              minHeight: 7,
+              backgroundColor: VColors.surface700,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AvgRow extends StatelessWidget {
+  const _AvgRow(
+      {required this.icon, required this.label, required this.value});
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: VSpace.x3),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: VColors.brand500.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(VRadius.sm),
+            ),
+            child: Icon(icon, size: 14, color: VColors.brand400),
+          ),
+          const SizedBox(width: VSpace.x3),
+          Expanded(
+            child: Text(label,
+                style:
+                    VType.caption.copyWith(color: VColors.contentDefault)),
+          ),
+          Text(value,
+              style: VType.label
+                  .copyWith(color: VColors.contentStrong)),
+        ],
+      ),
     );
   }
 }

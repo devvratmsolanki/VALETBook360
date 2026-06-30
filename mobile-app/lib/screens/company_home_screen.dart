@@ -406,6 +406,26 @@ class _DashboardTab extends ConsumerWidget {
           ..sort((a, b) => b.value.compareTo(a.value));
         final top5 = leaderboard.take(5).toList();
 
+        // Analytics: status breakdown, location volume, peak hours.
+        final cancelled = all.where((t) => t.status == LifecycleStatus.cancelled).length;
+        final locTotals = <String, int>{};
+        for (final t in all) {
+          final name = locNames[t.locationId] ?? 'Unassigned';
+          locTotals[name] = (locTotals[name] ?? 0) + 1;
+        }
+        final locsByVolume = locTotals.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+        final maxLocVol = locsByVolume.isEmpty ? 1 : locsByVolume.first.value;
+        final hourCounts = <int, int>{};
+        for (final t in all) {
+          if (t.createdAt == null) continue;
+          final h = t.createdAt!.toLocal().hour;
+          hourCounts[h] = (hourCounts[h] ?? 0) + 1;
+        }
+        final peakHours = (hourCounts.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value))).take(5).toList();
+        final maxPeak = peakHours.isEmpty ? 1 : peakHours.first.value;
+
         final stats = [
           _StatCardData('Active Cars', active.length.toString(),
               Icons.directions_car_filled_rounded, VColors.brand400),
@@ -473,6 +493,49 @@ class _DashboardTab extends ConsumerWidget {
                           .copyWith(color: VColors.contentStrong)),
                   const SizedBox(height: VSpace.x3),
                   _WeekBarChart(dailyCounts: weekVolume),
+
+                  // Analytics
+                  const SizedBox(height: VSpace.x6),
+                  Text('Analytics',
+                      style: VType.label
+                          .copyWith(color: VColors.contentStrong)),
+                  const SizedBox(height: VSpace.x3),
+                  _AnalyticsCard(
+                    title: 'Status breakdown',
+                    children: all.isEmpty
+                        ? [Text('No data yet', style: VType.caption)]
+                        : [
+                            _HBarRow(label: 'Active', value: active.length, maxVal: all.length, color: VColors.brand400),
+                            _HBarRow(label: 'Delivered', value: delivered.length, maxVal: all.length, color: VColors.alertSuccess),
+                            _HBarRow(label: 'Requested', value: requested, maxVal: all.length, color: VColors.statusReady),
+                            _HBarRow(label: 'Cancelled', value: cancelled, maxVal: all.length, color: VColors.alertDanger),
+                          ],
+                  ),
+                  if (locsByVolume.isNotEmpty) ...[
+                    const SizedBox(height: VSpace.x3),
+                    _AnalyticsCard(
+                      title: 'Volume by location',
+                      children: [
+                        for (final e in locsByVolume)
+                          _HBarRow(label: e.key, value: e.value, maxVal: maxLocVol, color: VColors.brand400),
+                      ],
+                    ),
+                  ],
+                  if (peakHours.isNotEmpty) ...[
+                    const SizedBox(height: VSpace.x3),
+                    _AnalyticsCard(
+                      title: 'Peak check-in hours',
+                      children: [
+                        for (final e in peakHours)
+                          _HBarRow(
+                            label: '${e.key}:00 – ${(e.key + 1) % 24}:00',
+                            value: e.value,
+                            maxVal: maxPeak,
+                            color: VColors.statusReady,
+                          ),
+                      ],
+                    ),
+                  ],
 
                   // Active by Location
                   if (byLocSorted.isNotEmpty) ...[
@@ -660,6 +723,83 @@ class _LeaderboardRow extends StatelessWidget {
           ),
           Text('$delivered delivered',
               style: VType.label.copyWith(color: VColors.brand300)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Card wrapper for an analytics section with a title + list of bars.
+class _AnalyticsCard extends StatelessWidget {
+  const _AnalyticsCard({required this.title, required this.children});
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(VSpace.x4),
+      decoration: BoxDecoration(
+        color: VColors.surface900,
+        borderRadius: BorderRadius.circular(VRadius.lg),
+        border: Border.all(color: VColors.surface700),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: VType.label.copyWith(color: VColors.contentStrong)),
+          const SizedBox(height: VSpace.x4),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+/// Labeled horizontal progress bar row — label + animated fill + count.
+class _HBarRow extends StatelessWidget {
+  const _HBarRow(
+      {required this.label,
+      required this.value,
+      required this.maxVal,
+      required this.color});
+  final String label;
+  final int value;
+  final int maxVal;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final frac = maxVal > 0 ? (value / maxVal).clamp(0.0, 1.0) : 0.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: VSpace.x3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(label,
+                    style: VType.caption
+                        .copyWith(color: VColors.contentDefault)),
+              ),
+              Text('$value',
+                  style: VType.caption.copyWith(
+                      color: VColors.contentStrong,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 5),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(VRadius.full),
+            child: LinearProgressIndicator(
+              value: frac,
+              minHeight: 7,
+              backgroundColor: VColors.surface700,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          ),
         ],
       ),
     );
