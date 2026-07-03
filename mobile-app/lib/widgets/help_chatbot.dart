@@ -10,7 +10,7 @@ import '../theme/v_tokens.dart';
 /// Floating, role-aware help assistant for the Flutter app. Designed to be the
 /// top layer of a Stack (it positions its own launcher + panel), mounted once
 /// in [main] above the router and gated on auth — so it appears on every
-/// authenticated screen and never on login. The Anthropic key stays server-side
+/// authenticated screen and never on login. The Groq API key stays server-side
 /// (the auth-service /assistant/chat endpoint); this only sends/receives text.
 class HelpChatbot extends ConsumerStatefulWidget {
   const HelpChatbot({super.key});
@@ -48,6 +48,7 @@ class _HelpChatbotState extends ConsumerState<HelpChatbot> {
     ];
     setState(() {
       _messages.add((role: 'user', content: text));
+      _capMessages();
       _input.clear();
       _busy = true;
       _error = null;
@@ -56,7 +57,10 @@ class _HelpChatbotState extends ConsumerState<HelpChatbot> {
     try {
       final reply = await ref.read(apiClientProvider).askAssistant(history, text);
       if (!mounted) return;
-      setState(() => _messages.add((role: 'assistant', content: reply)));
+      setState(() {
+        _messages.add((role: 'assistant', content: reply));
+        _capMessages();
+      });
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
@@ -69,10 +73,33 @@ class _HelpChatbotState extends ConsumerState<HelpChatbot> {
     }
   }
 
+  /// Keep memory bounded: drop the oldest pair once we exceed 40 entries.
+  void _capMessages() {
+    while (_messages.length > 40) {
+      _messages.removeRange(0, 2);
+    }
+  }
+
+  /// Reset the conversation. Clearing _messages makes the empty-state
+  /// suggestion chips reappear (they render only when _messages is empty).
+  void _clear() {
+    setState(() {
+      _messages.clear();
+      _error = null;
+    });
+  }
+
   void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        // animateTo (not jumpTo): if the list is still laying out this frame,
+        // the short animation re-reads maxScrollExtent as it settles, so the
+        // newest bubble reliably ends up in view.
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
@@ -160,6 +187,12 @@ class _HelpChatbotState extends ConsumerState<HelpChatbot> {
                             overflow: TextOverflow.ellipsis),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'Clear conversation',
+                    onPressed: _messages.isEmpty ? null : _clear,
+                    icon: Icon(Icons.delete_outline_rounded,
+                        size: 18, color: VColors.contentMuted),
                   ),
                 ],
               ),
