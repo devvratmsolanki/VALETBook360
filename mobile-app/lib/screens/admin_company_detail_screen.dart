@@ -8,6 +8,7 @@ import '../theme/v_breakpoints.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../utils/qr_sheet.dart' as qr_util;
 import '../widgets/app_logo.dart';
 import '../widgets/v_adaptive.dart';
 import '../widgets/v_states.dart';
@@ -235,6 +236,12 @@ class _LocationsTab extends ConsumerWidget {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    IconButton(
+                      tooltip: 'Guest QR',
+                      icon: Icon(Icons.qr_code_rounded,
+                          size: 20, color: VColors.contentMuted),
+                      onPressed: () => qr_util.showQrSheet(context, loc.name),
+                    ),
                     IconButton(
                       tooltip: 'Edit',
                       icon: Icon(Icons.edit_outlined,

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/admin_location.dart';
 import '../models/lifecycle_status.dart';
 import '../models/transaction.dart';
 import '../state/providers.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../utils/qr_sheet.dart' as qr_util;
 import '../widgets/v_states.dart';
 
 class FacilityOwnerHomeScreen extends ConsumerStatefulWidget {
@@ -87,6 +89,12 @@ class _FacilityOwnerHomeScreenState
                             overflow: TextOverflow.ellipsis),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'Guest QR',
+                    icon: Icon(Icons.qr_code_rounded,
+                        color: VColors.contentMuted, size: 20),
+                    onPressed: () => _showQr(context, locations),
                   ),
                   IconButton(
                     onPressed: () =>
@@ -183,6 +191,68 @@ class _FacilityOwnerHomeScreenState
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showQr(BuildContext context, List<AdminLocation> locations) {
+    if (locations.isEmpty) {
+      qr_util.showQrSheet(context, 'Facility Owner');
+      return;
+    }
+    if (locations.length == 1) {
+      qr_util.showQrSheet(context, locations.first.name);
+      return;
+    }
+    // Multiple locations — let them pick which label to use.
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: VColors.surface900,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(VRadius.xl)),
+          border: Border(top: BorderSide(color: VColors.surface700)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(VSpace.x5),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: VSpace.x4),
+                    decoration: BoxDecoration(
+                      color: VColors.surface600,
+                      borderRadius: BorderRadius.circular(VRadius.full),
+                    ),
+                  ),
+                ),
+                Text('Select location',
+                    style: VType.title.copyWith(color: VColors.contentStrong)),
+                const SizedBox(height: VSpace.x4),
+                ...locations.map((loc) => ListTile(
+                      leading: Icon(Icons.place_rounded,
+                          color: VColors.brand300, size: 20),
+                      title: Text(loc.name,
+                          style: VType.label
+                              .copyWith(color: VColors.contentStrong)),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        qr_util.showQrSheet(context, loc.name);
+                      },
+                    )),
+                const SizedBox(height: VSpace.x2),
+              ],
+            ),
+          ),
         ),
       ),
     );

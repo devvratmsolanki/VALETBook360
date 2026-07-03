@@ -1,13 +1,8 @@
-import 'dart:js_interop';
-import 'package:web/web.dart' as web;
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:qr_flutter/qr_flutter.dart';
 import '../models/driver.dart';
+import '../utils/qr_sheet.dart' as qr_util;
 import '../models/lifecycle_status.dart';
 import '../models/transaction.dart';
 import '../api/api_client.dart';
@@ -112,7 +107,8 @@ class _OperatorFloorScreenState extends ConsumerState<OperatorFloorScreen>
               minHeight: VTarget.minTouch,
             ),
             icon: Icon(Icons.qr_code_rounded, color: VColors.contentMuted),
-            onPressed: () => _showQr(context),
+            onPressed: () => qr_util.showQrSheet(
+                context, user?.displayName ?? 'Valet Location'),
           ),
           const ThemeToggleButton(),
           IconButton(
@@ -175,162 +171,6 @@ class _OperatorFloorScreenState extends ConsumerState<OperatorFloorScreen>
     if (plate != null && context.mounted) {
       _toast(context, 'Added · $plate', VColors.alertSuccess);
     }
-  }
-
-  /// Guest portal URL. Flutter web defaults to hash routing, so routes live under
-  /// /#/path. The port is omitted when 80/443 to produce clean URLs.
-  String _guestPortalUrl() {
-    final base = Uri.base;
-    final port = (base.port == 80 || base.port == 443) ? '' : ':${base.port}';
-    return '${base.scheme}://${base.host}$port/#/guest';
-  }
-
-  void _showQr(BuildContext context) {
-    final url = _guestPortalUrl();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: BoxDecoration(
-          color: VColors.surface900,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(VRadius.xl)),
-          border: Border(top: BorderSide(color: VColors.surface700)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(VSpace.x6),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40, height: 4,
-                  margin: const EdgeInsets.only(bottom: VSpace.x5),
-                  decoration: BoxDecoration(
-                    color: VColors.surface600,
-                    borderRadius: BorderRadius.circular(VRadius.full),
-                  ),
-                ),
-                Text('Guest Portal QR', style: VType.title.copyWith(color: VColors.contentStrong)),
-                const SizedBox(height: VSpace.x2),
-                Text('Show this to your guest — they scan to track their car.',
-                    style: VType.caption, textAlign: TextAlign.center),
-                const SizedBox(height: VSpace.x5),
-                Container(
-                  padding: const EdgeInsets.all(VSpace.x3),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(VRadius.md),
-                  ),
-                  child: QrImageView(
-                    data: url,
-                    version: QrVersions.auto,
-                    size: 220,
-                    eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
-                    dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Colors.black),
-                  ),
-                ),
-                const SizedBox(height: VSpace.x4),
-                Text(url, style: VType.caption, textAlign: TextAlign.center),
-                const SizedBox(height: VSpace.x2),
-                OutlinedButton.icon(
-                  onPressed: () => _downloadQrPdf(url),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: VColors.contentStrong,
-                    side: BorderSide(color: VColors.surface600),
-                    padding: const EdgeInsets.symmetric(horizontal: VSpace.x5, vertical: VSpace.x3),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(VRadius.md)),
-                  ),
-                  icon: const Icon(Icons.download_rounded, size: 18),
-                  label: Text('Download PDF (4 × 8 codes)', style: VType.label),
-                ),
-                const SizedBox(height: VSpace.x2),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Builds a PDF with 4 × 8 identical QR codes pointing at [url].
-  /// Drawn module-by-module so no image conversion step is needed.
-  Future<Uint8List> _buildQrPdfBytes(String url) async {
-    final qrImg = QrImage(QrCode.fromData(
-      data: url,
-      errorCorrectLevel: QrErrorCorrectLevel.M,
-    ));
-    final moduleCount = qrImg.moduleCount;
-
-    const cols = 4;
-    const rows = 8;
-    const pageMargin = 20.0;
-
-    final pageW = PdfPageFormat.a4.width - pageMargin * 2;
-    final pageH = PdfPageFormat.a4.height - pageMargin * 2;
-    final cellW = pageW / cols;
-    final cellH = pageH / rows;
-    final qrSize = min(cellW, cellH) * 0.80;
-
-    void paintQr(PdfGraphics canvas, PdfPoint size) {
-      final mod = size.x / moduleCount;
-      canvas.setFillColor(PdfColors.black);
-      for (int row = 0; row < moduleCount; row++) {
-        for (int col = 0; col < moduleCount; col++) {
-          if (qrImg.isDark(row, col)) {
-            final x = col * mod;
-            final y = size.y - (row + 1) * mod; // PDF origin is bottom-left
-            canvas
-              ..drawRect(x, y, mod, mod)
-              ..fillPath();
-          }
-        }
-      }
-    }
-
-    final doc = pw.Document();
-    doc.addPage(pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(pageMargin),
-      build: (_) => pw.Column(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-        children: List.generate(
-          rows,
-          (r) => pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-            children: List.generate(
-              cols,
-              (_) => pw.SizedBox(
-                width: cellW,
-                height: cellH,
-                child: pw.Center(
-                  child: pw.CustomPaint(
-                    size: PdfPoint(qrSize, qrSize),
-                    painter: paintQr,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ));
-
-    return doc.save();
-  }
-
-  void _downloadQrPdf(String url) async {
-    final bytes = await _buildQrPdfBytes(url);
-    final blob = web.Blob(
-      [bytes.toJS].toJS,
-      web.BlobPropertyBag(type: 'application/pdf'),
-    );
-    final dlUrl = web.URL.createObjectURL(blob);
-    final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
-    anchor.href = dlUrl;
-    anchor.download = 'guest-qr-codes.pdf';
-    anchor.click();
-    web.URL.revokeObjectURL(dlUrl);
   }
 
   Widget _body(BuildContext context, WidgetRef ref, FloorState floor) {

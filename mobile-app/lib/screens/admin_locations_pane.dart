@@ -7,6 +7,7 @@ import '../theme/v_breakpoints.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../utils/qr_sheet.dart' as qr_util;
 import '../widgets/v_adaptive.dart';
 import '../widgets/v_states.dart';
 import 'admin_location_create_screen.dart';
@@ -229,6 +230,13 @@ class _LocationCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis),
                     ],
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Guest QR',
+                  icon: Icon(Icons.qr_code_rounded,
+                      size: 18, color: VColors.contentMuted),
+                  onPressed: () =>
+                      qr_util.showQrSheet(context, location.name),
                 ),
                 IconButton(
                   tooltip: 'Edit',

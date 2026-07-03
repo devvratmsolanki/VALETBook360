@@ -13,6 +13,7 @@ import '../theme/v_breakpoints.dart';
 import '../theme/v_colors.dart';
 import '../theme/v_theme.dart';
 import '../theme/v_tokens.dart';
+import '../utils/qr_sheet.dart' as qr_util;
 import '../widgets/app_logo.dart';
 import '../widgets/mission_card.dart';
 import '../widgets/success_burst.dart';
@@ -127,6 +128,16 @@ class _MissionStackScreenState extends ConsumerState<MissionStackScreen>
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Guest QR',
+            constraints: const BoxConstraints(
+              minWidth: VTarget.minTouch,
+              minHeight: VTarget.minTouch,
+            ),
+            icon: Icon(Icons.qr_code_rounded, color: VColors.contentMuted),
+            onPressed: () => qr_util.showQrSheet(
+                context, user?.displayName ?? 'Guest Portal'),
+          ),
           const ThemeToggleButton(),
           IconButton(
             tooltip: 'Refresh',

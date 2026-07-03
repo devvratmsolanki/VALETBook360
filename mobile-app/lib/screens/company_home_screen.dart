@@ -17,6 +17,7 @@ import '../widgets/app_logo.dart';
 import '../widgets/theme_toggle_button.dart';
 import '../widgets/v_primary_button.dart';
 import '../widgets/v_states.dart';
+import '../utils/qr_sheet.dart' as qr_util;
 import 'admin_location_create_screen.dart';
 import 'admin_staff_create_screen.dart';
 import 'location_detail_screen.dart';
@@ -1618,6 +1619,15 @@ class _LocationRow extends StatelessWidget {
                       ),
                     ],
                     const Spacer(),
+                    GestureDetector(
+                      onTap: () => qr_util.showQrSheet(context, loc.name),
+                      child: Tooltip(
+                        message: 'Guest QR',
+                        child: Icon(Icons.qr_code_rounded,
+                            size: 18, color: VColors.contentMuted),
+                      ),
+                    ),
+                    const SizedBox(width: VSpace.x3),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
