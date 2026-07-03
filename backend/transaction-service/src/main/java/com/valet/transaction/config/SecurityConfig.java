@@ -70,6 +70,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Health/readiness for compose + k8s probes.
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                        // Guest portal: public endpoints authenticated only by plate + last4 of phone.
+                        .requestMatchers("/api/guest/**").permitAll()
                         // Driver mission endpoints: driver role only. Ownership of the
                         // specific transaction is enforced in the service layer (403).
                         .requestMatchers("/api/driver/**").hasRole("DRIVER")
@@ -79,6 +81,8 @@ public class SecurityConfig {
                         // JwtAuthenticationFilter produces ROLE_<ROLE> authorities, so
                         // hasAnyRole("VALET","MANAGER","ADMIN") matches correctly.
                         .requestMatchers("/api/operator/**").hasAnyRole("VALET", "MANAGER", "ADMIN")
+                        // Facility owner dashboard: read-only, scoped to their assigned location.
+                        .requestMatchers("/api/facility-owner/transactions/**").hasAnyRole("FACILITY_OWNER", "MANAGER", "ADMIN")
                         // Everything else requires any authenticated caller.
                         .anyRequest().authenticated()
                 )

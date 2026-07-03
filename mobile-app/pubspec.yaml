@@ -23,11 +23,16 @@ dependencies:
   # Realtime gateway — Socket.IO 4.x (Engine.IO v4) client.
   socket_io_client: ^2.0.3+1
 
+  # Web APIs (replaces deprecated dart:html) — Blob + anchor click for PDF download.
+  web: ^1.1.0
+
   cupertino_icons: ^1.0.8
 
   # Real brand typefaces (Space Grotesk display + Inter UI + JetBrains Mono),
   # fetched/cached at runtime so we don't have to vendor .ttf binaries.
   google_fonts: ^6.2.1
+  qr_flutter: ^4.1.0
+  pdf: ^3.12.0
 
 dev_dependencies:
   flutter_test:

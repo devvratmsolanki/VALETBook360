@@ -33,11 +33,8 @@ class OperatorCreateSheet extends ConsumerStatefulWidget {
 class _OperatorCreateSheetState extends ConsumerState<OperatorCreateSheet> {
   final _formKey = GlobalKey<FormState>();
   final _plate = TextEditingController();
-  final _make = TextEditingController();
-  final _model = TextEditingController();
-  final _color = TextEditingController();
   final _guestName = TextEditingController();
-  final _guestPhone = TextEditingController();
+  final _last4 = TextEditingController();
   bool _busy = false;
 
   /// The chosen key slot name (sent as `keyCode`). Auto-selected to the lowest
@@ -49,11 +46,8 @@ class _OperatorCreateSheetState extends ConsumerState<OperatorCreateSheet> {
   @override
   void dispose() {
     _plate.dispose();
-    _make.dispose();
-    _model.dispose();
-    _color.dispose();
     _guestName.dispose();
-    _guestPhone.dispose();
+    _last4.dispose();
     super.dispose();
   }
 
@@ -64,11 +58,8 @@ class _OperatorCreateSheetState extends ConsumerState<OperatorCreateSheet> {
 
     final input = CreateTransactionInput(
       carPlate: _plate.text.trim().toUpperCase(),
-      carMake: _make.text,
-      carModel: _model.text,
-      carColor: _color.text,
-      guestName: _guestName.text,
-      guestPhone: _guestPhone.text,
+      guestName: _guestName.text.trim(),
+      guestPhone: _last4.text.trim(),
       keyCode: _selectedSlot ?? '',
     );
     final tx = await ref.read(floorControllerProvider.notifier).create(input);
@@ -157,7 +148,7 @@ class _OperatorCreateSheetState extends ConsumerState<OperatorCreateSheet> {
                       style: VType.title.copyWith(
                           color: VColors.contentStrong)),
                   const SizedBox(height: VSpace.x1),
-                  Text('Check a vehicle onto the floor.',
+                  Text('Plate + name + last 4 digits of phone.',
                       style: VType.caption),
                   const SizedBox(height: VSpace.x5),
                   if (err != null) ...[
@@ -166,51 +157,38 @@ class _OperatorCreateSheetState extends ConsumerState<OperatorCreateSheet> {
                   ],
                   _field(
                     controller: _plate,
-                    label: 'License plate',
-                    hint: 'ABC1234',
+                    label: 'License plate *',
+                    hint: 'MH12AB1234',
                     textCapitalization: TextCapitalization.characters,
                     enabled: !_busy,
                     validator: (v) {
                       final s = (v ?? '').trim();
                       if (s.isEmpty) return 'Plate is required';
-                      if (!RegExp(r'^[A-Za-z0-9]{4,12}$').hasMatch(s)) {
-                        return '4–12 letters/numbers';
+                      if (!RegExp(r'^[A-Za-z0-9]{2,15}$').hasMatch(s)) {
+                        return '2–15 letters/numbers only';
                       }
                       return null;
                     },
                   ),
-                  _row(
-                    _field(
-                      controller: _make,
-                      label: 'Make',
-                      hint: 'Tesla',
-                      enabled: !_busy,
-                    ),
-                    _field(
-                      controller: _model,
-                      label: 'Model',
-                      hint: 'Model 3',
-                      enabled: !_busy,
-                    ),
-                  ),
-                  _field(
-                    controller: _color,
-                    label: 'Color',
-                    hint: 'Midnight',
-                    enabled: !_busy,
-                  ),
                   _field(
                     controller: _guestName,
-                    label: 'Guest name',
+                    label: 'Owner name',
                     hint: 'Riya Sharma',
+                    textCapitalization: TextCapitalization.words,
                     enabled: !_busy,
                   ),
                   _field(
-                    controller: _guestPhone,
-                    label: 'Guest phone',
-                    hint: '+1 555 0100',
-                    keyboardType: TextInputType.phone,
+                    controller: _last4,
+                    label: 'Last 4 digits of phone *',
+                    hint: '9876',
+                    keyboardType: TextInputType.number,
                     enabled: !_busy,
+                    validator: (v) {
+                      final s = (v ?? '').trim();
+                      if (s.isEmpty) return 'Last 4 digits required';
+                      if (!RegExp(r'^\d{4}$').hasMatch(s)) return 'Enter exactly 4 digits';
+                      return null;
+                    },
                   ),
                   const SizedBox(height: VSpace.x5),
                   VPrimaryButton(
@@ -227,16 +205,6 @@ class _OperatorCreateSheetState extends ConsumerState<OperatorCreateSheet> {
       ),
     );
   }
-
-  Widget _row(Widget a, Widget b) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: a),
-          const SizedBox(width: VSpace.x3),
-          Expanded(child: b),
-        ],
-      );
-
 
   Widget _field({
     required TextEditingController controller,

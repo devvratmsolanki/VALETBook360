@@ -271,8 +271,8 @@ class _CompanyCardState extends State<_CompanyCard> {
           // ---- Header ----
           InkWell(
             borderRadius: BorderRadius.vertical(
-                top: Radius.circular(VRadius.lg),
-                bottom: _expanded ? Radius.zero : Radius.circular(VRadius.lg)),
+                top: const Radius.circular(VRadius.lg),
+                bottom: _expanded ? Radius.zero : const Radius.circular(VRadius.lg)),
             onTap: () => setState(() => _expanded = !_expanded),
             child: Padding(
               padding: const EdgeInsets.all(VSpace.x4),

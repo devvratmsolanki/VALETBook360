@@ -635,7 +635,48 @@ class ApiClient {
     }
   }
 
+  Future<List<Transaction>> fetchFacilityOwnerTransactions() async {
+    try {
+      final res = await _core.get(ApiConfig.facilityOwnerTransactionsPath);
+      _ensureOk(res);
+      return _asList(res.data)
+          .whereType<Map<String, dynamic>>()
+          .map(Transaction.fromJson)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  Future<List<Transaction>> fetchFacilityOwnerTransactionHistory() async {
+    try {
+      final res = await _core.get(ApiConfig.facilityOwnerHistoryPath);
+      _ensureOk(res);
+      return _asList(res.data)
+          .whereType<Map<String, dynamic>>()
+          .map(Transaction.fromJson)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   // ---- CORE (authed) ----
+
+  /// GET /api/driver/history?page=&size= — delivered cars, newest first.
+  Future<List<Transaction>> fetchDriverHistory({int page = 0, int size = 50}) async {
+    try {
+      final res = await _core.get(ApiConfig.driverHistoryPath,
+          queryParameters: {'page': page, 'size': size});
+      _ensureOk(res);
+      return _asList(res.data)
+          .whereType<Map<String, dynamic>>()
+          .map(Transaction.fromJson)
+          .toList(growable: false);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
 
   /// GET /api/driver/assignments
   Future<List<Assignment>> fetchAssignments() async {
@@ -692,12 +733,12 @@ class ApiClient {
     }
   }
 
-  /// GET /api/operator/transactions/history → full company history (every
-  /// status, newest first). Powers the company panel Dashboard / Transactions /
-  /// Analytics tabs.
-  Future<List<Transaction>> fetchTransactionHistory() async {
+  /// GET /api/operator/transactions/history?page=&size= — full company history,
+  /// newest first, paginated.
+  Future<List<Transaction>> fetchTransactionHistory({int page = 0, int size = 50}) async {
     try {
-      final res = await _core.get(ApiConfig.operatorHistoryPath);
+      final res = await _core.get(ApiConfig.operatorHistoryPath,
+          queryParameters: {'page': page, 'size': size});
       _ensureOk(res);
       return _asList(res.data)
           .whereType<Map<String, dynamic>>()

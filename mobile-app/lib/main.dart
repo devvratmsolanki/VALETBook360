@@ -9,6 +9,12 @@ import 'widgets/help_chatbot.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Surface framework errors to the console in release mode instead of
+  // silently swallowing them. Replace with a crash-reporting SDK (e.g. Sentry)
+  // before going to production.
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+  };
   runApp(const ProviderScope(child: ValetDriverApp()));
 }
 

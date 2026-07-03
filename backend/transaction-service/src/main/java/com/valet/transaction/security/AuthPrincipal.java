@@ -1,5 +1,6 @@
 package com.valet.transaction.security;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -14,7 +15,8 @@ public record AuthPrincipal(
         UUID companyId,
         UUID locationId,
         String email,
-        String name
+        String name,
+        List<UUID> locationIds   // facility owners: all assigned location IDs
 ) {
     /** Convenience: driver endpoints treat the subject as the driverId. */
     public UUID driverId() {

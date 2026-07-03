@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -69,14 +70,15 @@ public class OperatorController {
     }
 
     /**
-     * Full company transaction history (every status, newest first, recent 500).
-     * Powers the company panel Dashboard / Transactions / Analytics tabs.
-     * Tenant-scoped to the caller's company.
+     * Full company transaction history (every status, newest first, paginated).
+     * Default page=0, size=50. Client checks hasMore = (results.size == size).
      */
     @GetMapping("/transactions/history")
-    public List<TransactionResponse> history() {
+    public List<TransactionResponse> history(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
         AuthPrincipal principal = operatorPrincipal();
-        return service.getCompanyHistory(principal.companyId()).stream()
+        return service.getCompanyHistory(principal.companyId(), page, size).stream()
                 .map(TransactionMapper::toResponse)
                 .toList();
     }

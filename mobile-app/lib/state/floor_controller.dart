@@ -72,6 +72,12 @@ class FloorController extends StateNotifier<FloorState> {
   StreamSubscription<RealtimeStatus>? _statusSub;
   Timer? _pollTimer;
 
+  /// O(1) membership check for realtime deltas — avoids linear scan over
+  /// the transactions list on every incoming socket event.
+  // ponytail: Set<String>; upgrade to Map<String, int> (id→index) if we ever
+  // need O(1) positional updates instead of just O(1) presence checks.
+  Set<String> _knownIds = {};
+
   /// BUG-15: set when a realtime delta lands for the in-flight ([busyId]) card
   /// during an optimistic action. If the action's HTTP call then fails, we must
   /// NOT roll back — the realtime event already carried authoritative server
@@ -128,7 +134,7 @@ class FloorController extends StateNotifier<FloorState> {
       _realtimeAppliedDuringAction = true;
     }
 
-    final known = state.transactions.any((t) => t.id == id);
+    final known = _knownIds.contains(id);
     if (!known) {
       // New card or one that scrolled off — reconcile from the source of truth.
       load(silent: true);
@@ -152,6 +158,7 @@ class FloorController extends StateNotifier<FloorState> {
       final all = await _client.fetchTransactions();
       final active =
           all.where((t) => !_terminal.contains(t.status)).toList();
+      _knownIds = {for (final t in active) t.id};
       state = state.copyWith(
         status: active.isEmpty ? FloorStatus.empty : FloorStatus.ready,
         transactions: active,
@@ -178,7 +185,8 @@ class FloorController extends StateNotifier<FloorState> {
       final tx = await _client.createTransaction(input);
       // Optimistically prepend (newest first); the realtime tx:created may also
       // arrive — _onRealtime is idempotent for a known id.
-      if (!state.transactions.any((t) => t.id == tx.id)) {
+      if (!_knownIds.contains(tx.id)) {
+        _knownIds.add(tx.id);
         state = state.copyWith(
           status: FloorStatus.ready,
           transactions: [tx, ...state.transactions],
@@ -217,6 +225,7 @@ class FloorController extends StateNotifier<FloorState> {
       await _client.operatorAction(tx.id, action, driverId: driverId);
       // Cancelled cars leave the floor.
       if (action == OperatorAction.cancel) {
+        _knownIds.remove(tx.id);
         final remaining =
             state.transactions.where((t) => t.id != tx.id).toList();
         state = state.copyWith(
@@ -271,6 +280,7 @@ class FloorController extends StateNotifier<FloorState> {
   /// terminal). Does not touch [busyId] — local actions own that.
   void _applyStatus(String id, LifecycleStatus status) {
     if (_terminal.contains(status)) {
+      _knownIds.remove(id);
       final remaining = state.transactions.where((t) => t.id != id).toList();
       state = state.copyWith(
         status: remaining.isEmpty ? FloorStatus.empty : FloorStatus.ready,

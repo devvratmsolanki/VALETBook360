@@ -147,7 +147,7 @@ class _OverviewTab extends StatelessWidget {
             _Stat('Facility Owners', state.facilityOwners.length),
           ]),
           const SizedBox(height: VSpace.x5),
-          _SectionLabel('Company Info'),
+          const _SectionLabel('Company Info'),
           const SizedBox(height: VSpace.x2),
           _InfoCard(rows: [
             _InfoRow('Owner', c?.ownerName ?? '—'),
@@ -566,7 +566,7 @@ class _MemberCard extends StatelessWidget {
                     child: Switch(
                       value: isActive,
                       onChanged: (_) => onToggle(),
-                      activeColor: VColors.alertSuccess,
+                      activeThumbColor: VColors.alertSuccess,
                     ),
                   ),
               ],

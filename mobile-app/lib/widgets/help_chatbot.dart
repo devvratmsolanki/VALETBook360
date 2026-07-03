@@ -83,19 +83,21 @@ class _HelpChatbotState extends ConsumerState<HelpChatbot> {
     final panelW = size.width - 40 < 380.0 ? size.width - 40 : 380.0;
     final panelH = size.height - 160 < 520.0 ? size.height - 160 : 520.0;
 
-    // bottom offset driven by a provider: screens with a NavigationBar raise it
-    // above both the bar and the primary FAB; default 88 for screens without one.
-    final bottom = ref.watch(chatbotBottomOffsetProvider);
+    // bottom offset: provider value (screens with a NavigationBar raise it)
+    // plus system safe-area inset so we never clip under home indicator / nav bar.
+    final providerBottom = ref.watch(chatbotBottomOffsetProvider);
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final bottom = providerBottom + safeBottom;
     return Stack(
       children: [
         if (_open)
           Positioned(
-            right: 20,
-            bottom: bottom + 68,
+            right: 16,
+            bottom: bottom + 64,
             child: _panel(panelW, panelH),
           ),
         Positioned(
-          right: 20,
+          right: 16,
           bottom: bottom,
           child: FloatingActionButton(
             heroTag: 'help_assistant_fab',

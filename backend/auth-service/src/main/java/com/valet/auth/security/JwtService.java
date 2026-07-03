@@ -1,7 +1,9 @@
 package com.valet.auth.security;
 
 import com.valet.auth.config.JwtProperties;
+import com.valet.auth.domain.Role;
 import com.valet.auth.domain.User;
+import com.valet.auth.repository.LocationRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -12,6 +14,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -29,9 +32,11 @@ public class JwtService {
 
     private final JwtProperties props;
     private final SecretKey key;
+    private final LocationRepository locations;
 
-    public JwtService(JwtProperties props) {
+    public JwtService(JwtProperties props, LocationRepository locations) {
         this.props = props;
+        this.locations = locations;
         String secret = props.getSecret();
         if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
             throw new IllegalStateException(
@@ -61,6 +66,21 @@ public class JwtService {
         }
         if (user.getLocationId() != null) {
             builder.claim("locationId", user.getLocationId().toString());
+        }
+
+        // Facility owners can manage multiple locations. Embed all assigned location IDs so
+        // downstream services can filter transactions without an extra auth-service round-trip.
+        // Primary source: locations.facility_owner_id. Fallback: users.location_id for accounts
+        // assigned via the staff form before multi-location support was introduced.
+        if (user.getRole() == Role.FACILITY_OWNER) {
+            List<String> ids = locations.findByFacilityOwnerIdOrderByNameAsc(user.getId())
+                    .stream().map(l -> l.getId().toString()).toList();
+            if (ids.isEmpty() && user.getLocationId() != null) {
+                ids = List.of(user.getLocationId().toString());
+            }
+            if (!ids.isEmpty()) {
+                builder.claim("locationIds", ids);
+            }
         }
 
         String jwt = builder.signWith(key).compact();

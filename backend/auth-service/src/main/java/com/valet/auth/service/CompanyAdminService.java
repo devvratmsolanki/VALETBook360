@@ -286,10 +286,18 @@ public class CompanyAdminService {
      */
     @Transactional(readOnly = true)
     public List<LocationResponse> listFacilityOwnerLocations(AuthPrincipal caller) {
-        return locations.findByFacilityOwnerIdOrderByNameAsc(caller.userId())
-                .stream()
-                .map(LocationResponse::from)
-                .toList();
+        // Primary: locations explicitly linked via facility_owner_id (set from location edit).
+        List<Location> byOwner = locations.findByFacilityOwnerIdOrderByNameAsc(caller.userId());
+        if (!byOwner.isEmpty()) {
+            return byOwner.stream().map(LocationResponse::from).toList();
+        }
+        // Fallback: location assigned on the user record itself (set from staff create/edit).
+        if (caller.locationId() != null) {
+            return locations.findById(caller.locationId())
+                    .map(l -> List.of(LocationResponse.from(l)))
+                    .orElse(List.of());
+        }
+        return List.of();
     }
 
     /**
@@ -607,9 +615,9 @@ public class CompanyAdminService {
                     "That user is not part of a manageable company.");
         }
         loadCompanyAuthorized(caller, u.getCompanyId());
-        if (u.getRole() != Role.VALET && u.getRole() != Role.DRIVER) {
+        if (u.getRole() != Role.VALET && u.getRole() != Role.DRIVER && u.getRole() != Role.FACILITY_OWNER) {
             throw ServiceException.forbidden("PROTECTED_ACCOUNT",
-                    "Only operator and driver accounts can be changed here.");
+                    "Only operator, driver, and facility owner accounts can be changed here.");
         }
         return u;
     }
@@ -656,9 +664,9 @@ public class CompanyAdminService {
         loadCompanyAuthorized(caller, companyId);
 
         Role role = req.role();
-        if (role != Role.VALET && role != Role.DRIVER) {
+        if (role != Role.VALET && role != Role.DRIVER && role != Role.FACILITY_OWNER) {
             throw ServiceException.badRequest("INVALID_STAFF_ROLE",
-                    "Staff role must be 'valet' (operator) or 'driver'.");
+                    "Staff role must be 'valet' (operator), 'driver', or 'facility_owner'.");
         }
 
         // If a location is supplied it must belong to THIS company (no cross-tenant
@@ -706,9 +714,9 @@ public class CompanyAdminService {
         User u = loadStaffUserAuthorized(caller, userId);
 
         Role role = req.role();
-        if (role != Role.VALET && role != Role.DRIVER) {
+        if (role != Role.VALET && role != Role.DRIVER && role != Role.FACILITY_OWNER) {
             throw ServiceException.badRequest("INVALID_STAFF_ROLE",
-                    "Staff role must be 'valet' (operator) or 'driver'.");
+                    "Staff role must be 'valet' (operator), 'driver', or 'facility_owner'.");
         }
 
         // A (re)assigned location must belong to THIS user's company.

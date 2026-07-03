@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -37,6 +38,16 @@ public class DriverController {
         UUID driverId = driverId();
         return service.getDriverAssignments(driverId).stream()
                 .map(TransactionMapper::toAssignment)
+                .toList();
+    }
+
+    /** GET /api/driver/history?page=0&size=50 — delivered cars, newest first, paginated. */
+    @GetMapping("/history")
+    public List<TransactionResponse> history(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return service.getDriverHistory(driverId(), page, size).stream()
+                .map(TransactionMapper::toResponse)
                 .toList();
     }
 

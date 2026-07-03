@@ -2,10 +2,14 @@ package com.valet.transaction.repository;
 
 import com.valet.transaction.domain.ValetStatus;
 import com.valet.transaction.domain.ValetTransaction;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface ValetTransactionRepository extends JpaRepository<ValetTransaction, UUID> {
@@ -51,9 +55,37 @@ public interface ValetTransactionRepository extends JpaRepository<ValetTransacti
 
     /**
      * Full transaction history for one company (ALL statuses incl.
-     * delivered/cancelled), newest first, capped at the most recent 500. Powers
-     * the company panel's Dashboard stats, Transactions tab, and Analytics
-     * aggregation. Covered by {@code ix_tx_company_status_created}.
+     * delivered/cancelled), newest first, paginated. Powers the company panel's
+     * Dashboard stats, Transactions tab, and Analytics aggregation.
+     * Covered by {@code ix_tx_company_status_created}.
      */
-    List<ValetTransaction> findTop500ByCompanyIdOrderByCreatedAtDesc(UUID companyId);
+    List<ValetTransaction> findByCompanyIdOrderByCreatedAtDesc(UUID companyId, Pageable pageable);
+
+    /**
+     * Guest lookup: find the most recent non-terminal transaction matching plate
+     * (case-insensitive) + last 4 digits. Both sides use RIGHT(…, 4) so:
+     *  - Operator may store full number or only 4 digits.
+     *  - Guest may enter full number or only last 4 digits.
+     * Either combination resolves correctly.
+     */
+    @Query("SELECT t FROM ValetTransaction t WHERE UPPER(t.carPlate) = UPPER(:plate) AND RIGHT(t.guestPhone, 4) = RIGHT(:last4, 4) AND t.status NOT IN :terminal ORDER BY t.createdAt DESC LIMIT 1")
+    Optional<ValetTransaction> findActiveByPlateAndLast4(@Param("plate") String plate, @Param("last4") String last4, @Param("terminal") Collection<ValetStatus> terminal);
+
+    /** Guest status poll: most recent transaction for this plate+phone, including terminal states. */
+    @Query("SELECT t FROM ValetTransaction t WHERE UPPER(t.carPlate) = UPPER(:plate) AND RIGHT(t.guestPhone, 4) = RIGHT(:last4, 4) ORDER BY t.createdAt DESC LIMIT 1")
+    Optional<ValetTransaction> findMostRecentByPlateAndLast4(@Param("plate") String plate, @Param("last4") String last4);
+
+    /** A driver's delivered-car history, most recently delivered first, paginated. */
+    List<ValetTransaction> findByRetrievedByDriverIdAndStatusInOrderByDeliveredAtDesc(
+            UUID retrievedByDriverId, Collection<ValetStatus> statuses, Pageable pageable);
+
+    /** Active non-terminal transactions across a set of locations (facility owner view), newest first. */
+    List<ValetTransaction> findByLocationIdInAndStatusNotInOrderByCreatedAtDesc(
+            Collection<UUID> locationIds, Collection<ValetStatus> statuses);
+
+    /** Transaction history across a set of locations, newest first, capped at 200. */
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT t FROM ValetTransaction t WHERE t.locationId IN :locationIds ORDER BY t.createdAt DESC LIMIT 200")
+    List<ValetTransaction> findTop200ByLocationIds(
+            @org.springframework.data.repository.query.Param("locationIds") Collection<UUID> locationIds);
 }

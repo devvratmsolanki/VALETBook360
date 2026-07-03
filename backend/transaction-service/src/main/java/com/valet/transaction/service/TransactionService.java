@@ -7,6 +7,7 @@ import com.valet.transaction.exception.ServiceException;
 import com.valet.transaction.realtime.RealtimeEventPublisher;
 import com.valet.transaction.repository.ValetTransactionRepository;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -162,14 +163,66 @@ public class TransactionService {
     }
 
     /**
-     * Full transaction history for one company (every status, newest first,
-     * most-recent 500). Tenant-scoped — companyId comes from the caller's
-     * principal. Powers the company panel's Dashboard, Transactions, and
-     * (client-aggregated) Analytics tabs.
+     * Full transaction history for one company (every status, newest first, paginated).
+     * Tenant-scoped — companyId comes from the caller's principal.
      */
     @Transactional(readOnly = true)
-    public List<ValetTransaction> getCompanyHistory(UUID companyId) {
-        return repository.findTop500ByCompanyIdOrderByCreatedAtDesc(companyId);
+    public List<ValetTransaction> getCompanyHistory(UUID companyId, int page, int size) {
+        return repository.findByCompanyIdOrderByCreatedAtDesc(
+                companyId, PageRequest.of(page, Math.min(size, 200)));
+    }
+
+    /** Guest lookup: find active transaction by plate + last 4 of phone. Throws NOT_FOUND if unmatched. */
+    @Transactional(readOnly = true)
+    public ValetTransaction guestLookup(String plate, String last4) {
+        return repository.findActiveByPlateAndLast4(plate.toUpperCase(), last4, TERMINAL_STATUSES)
+                .orElseThrow(() -> com.valet.transaction.exception.ServiceException.notFound("TRANSACTION_NOT_FOUND",
+                        "No active booking found for that plate and phone digits."));
+    }
+
+    /**
+     * Guest status poll: returns the most recent transaction for this plate+phone,
+     * including terminal states (delivered, cancelled). Used only by the /status
+     * endpoint so the guest portal can see the final delivered/cancelled state.
+     */
+    @Transactional(readOnly = true)
+    public ValetTransaction guestPollStatus(String plate, String last4) {
+        return repository.findMostRecentByPlateAndLast4(plate.toUpperCase(), last4)
+                .orElseThrow(() -> ServiceException.notFound("TRANSACTION_NOT_FOUND",
+                        "No booking found for that plate and phone digits."));
+    }
+
+    /** A driver's delivery history: cars they retrieved, newest-delivered-first, paginated. */
+    @Transactional(readOnly = true)
+    public List<ValetTransaction> getDriverHistory(UUID driverId, int page, int size) {
+        return repository.findByRetrievedByDriverIdAndStatusInOrderByDeliveredAtDesc(
+                driverId, List.of(ValetStatus.DELIVERED), PageRequest.of(page, Math.min(size, 100)));
+    }
+
+    /** Guest request: transition parked/key_in → requested. Idempotent if already in requested+. */
+    @Transactional
+    public ValetTransaction guestRequest(String plate, String last4) {
+        ValetTransaction tx = guestLookup(plate, last4);
+        // Allow re-entry without re-transitioning if already requested or later.
+        if (tx.getStatus() == ValetStatus.REQUESTED ||
+                tx.getStatus() == ValetStatus.DRIVER_ASSIGNED ||
+                tx.getStatus() == ValetStatus.EN_ROUTE ||
+                tx.getStatus() == ValetStatus.ARRIVED) {
+            return tx;
+        }
+        return transition(tx, ValetStatus.REQUESTED);
+    }
+
+    /** Active non-terminal transactions across a set of locations, newest first. */
+    @Transactional(readOnly = true)
+    public List<ValetTransaction> getActiveFloorByLocations(java.util.Collection<UUID> locationIds) {
+        return repository.findByLocationIdInAndStatusNotInOrderByCreatedAtDesc(locationIds, TERMINAL_STATUSES);
+    }
+
+    /** Transaction history across a set of locations, newest first, capped at 200. */
+    @Transactional(readOnly = true)
+    public List<ValetTransaction> getLocationHistory(java.util.Collection<UUID> locationIds) {
+        return repository.findTop200ByLocationIds(locationIds);
     }
 
     // --- operator floor operations ----------------------------------------

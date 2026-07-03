@@ -6,6 +6,7 @@ import '../models/admin_user.dart';
 import '../models/contract.dart';
 import '../models/lifecycle_status.dart';
 import '../models/transaction.dart';
+import '../state/companies_controller.dart';
 import '../state/company_detail_controller.dart';
 import '../state/providers.dart';
 import '../theme/v_breakpoints.dart';
@@ -41,10 +42,19 @@ class CompanyHomeScreen extends ConsumerWidget {
             : null);
 
     if (id == null) {
+      final isError = companies.status == CompaniesStatus.error;
       return Scaffold(
         backgroundColor: VColors.surface950,
         body: Center(
-          child: CircularProgressIndicator(color: VColors.brand400),
+          child: isError
+              ? Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: VBanner(
+                    message: companies.error ?? 'Could not load company. Please try again.',
+                    onRetry: () => ref.read(companiesControllerProvider.notifier).load(),
+                  ),
+                )
+              : CircularProgressIndicator(color: VColors.brand400),
         ),
       );
     }
@@ -288,8 +298,6 @@ class _MorePaneState extends ConsumerState<_MorePane> {
 // Shared helpers
 // ===========================================================================
 
-const _terminal = {LifecycleStatus.delivered, LifecycleStatus.cancelled};
-
 const _months = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -363,79 +371,83 @@ class _DashboardTab extends ConsumerWidget {
       error: (e, _) =>
           _error('Could not load the dashboard.', () => ref.invalidate(companyHistoryProvider)),
       data: (all) {
-        final active = all.where((t) => !_terminal.contains(t.status)).toList();
-        final delivered = all.where((t) => t.status == LifecycleStatus.delivered).toList();
-        final requested = all.where((t) => t.status == LifecycleStatus.requested).length;
-        final today = all.where((t) => _isToday(t.createdAt)).length;
+        // ponytail: single O(n) pass replaces 8 separate passes + intermediate
+        // list allocations. All accumulators are filled in one loop.
+        final active = <Transaction>[];
+        final delivered = <Transaction>[];
+        int requestedCount = 0, todayCount = 0, cancelledCount = 0;
+        int timedSecs = 0, timedCount = 0;
+        final byLoc = <String, int>{};    // active-only, for location chips
+        final locTotals = <String, int>{}; // all statuses, for analytics bar
+        final drvDelivered = <String, int>{};
+        final weekVolume = List.filled(7, 0);
+        final hourCounts = <int, int>{};
+        final now = DateTime.now();
+
+        for (final t in all) {
+          final status = t.status;
+          final isDelivered = status == LifecycleStatus.delivered;
+          final isCancelled = status == LifecycleStatus.cancelled;
+          final isTerminal = isDelivered || isCancelled;
+          final locName = locNames[t.locationId] ?? 'Unassigned';
+
+          locTotals[locName] = (locTotals[locName] ?? 0) + 1;
+
+          if (!isTerminal) {
+            active.add(t);
+            byLoc[locName] = (byLoc[locName] ?? 0) + 1;
+          }
+          if (isDelivered) {
+            delivered.add(t);
+            final drvId = t.retrievedByDriverId ?? t.parkedByDriverId;
+            if (drvId != null) {
+              drvDelivered[drvId] = (drvDelivered[drvId] ?? 0) + 1;
+            }
+            if (t.requestedAt != null && t.deliveredAt != null) {
+              timedSecs += t.deliveredAt!.difference(t.requestedAt!).inSeconds.abs();
+              timedCount++;
+            }
+          }
+          if (isCancelled) cancelledCount++;
+          if (status == LifecycleStatus.requested) requestedCount++;
+          if (_isToday(t.createdAt)) todayCount++;
+
+          if (t.createdAt != null) {
+            final local = t.createdAt!.toLocal();
+            final diff = now.difference(local).inDays;
+            if (diff >= 0 && diff < 7) weekVolume[diff]++;
+            hourCounts[local.hour] = (hourCounts[local.hour] ?? 0) + 1;
+          }
+        }
+
+        // Post-loop derived values (O(k) where k is small).
         final completionPct = all.isEmpty
             ? 0
             : ((delivered.length / all.length) * 100).round();
-
-        // Avg retrieval time (requested → delivered).
         String avgRetrieval = '—';
-        final timed = delivered
-            .where((t) => t.requestedAt != null && t.deliveredAt != null)
-            .toList();
-        if (timed.isNotEmpty) {
-          final totalSecs = timed.fold<int>(
-              0,
-              (sum, t) =>
-                  sum +
-                  t.deliveredAt!.difference(t.requestedAt!).inSeconds.abs());
-          final avgSecs = totalSecs / timed.length;
-          avgRetrieval = avgSecs < 60
-              ? '< 1 min'
-              : '${(avgSecs / 60).round()} min';
-        }
-
-        // Active cars grouped by location, busiest first.
-        final byLoc = <String, int>{};
-        for (final t in active) {
-          final name = locNames[t.locationId] ?? 'Unassigned';
-          byLoc[name] = (byLoc[name] ?? 0) + 1;
+        if (timedCount > 0) {
+          final avgSecs = timedSecs / timedCount;
+          avgRetrieval = avgSecs < 60 ? '< 1 min' : '${(avgSecs / 60).round()} min';
         }
         final byLocSorted = byLoc.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
-
-        // 7-day volume bars (0 = today, going back).
-        final now = DateTime.now();
-        final weekVolume = List.filled(7, 0);
-        for (final t in all) {
-          if (t.createdAt == null) continue;
-          final diff = now.difference(t.createdAt!.toLocal()).inDays;
-          if (diff >= 0 && diff < 7) weekVolume[diff]++;
-        }
-
-        // Driver leaderboard — top 5 by delivered count.
-        final drvDelivered = <String, int>{};
-        for (final t in delivered) {
-          final id = t.retrievedByDriverId ?? t.parkedByDriverId;
-          if (id == null) continue;
-          drvDelivered[id] = (drvDelivered[id] ?? 0) + 1;
-        }
-        final leaderboard = drvDelivered.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value));
-        final top5 = leaderboard.take(5).toList();
-
-        // Analytics: status breakdown, location volume, peak hours.
-        final cancelled = all.where((t) => t.status == LifecycleStatus.cancelled).length;
-        final locTotals = <String, int>{};
-        for (final t in all) {
-          final name = locNames[t.locationId] ?? 'Unassigned';
-          locTotals[name] = (locTotals[name] ?? 0) + 1;
-        }
+        final top5 = (drvDelivered.entries.toList()
+              ..sort((a, b) => b.value.compareTo(a.value)))
+            .take(5)
+            .toList();
         final locsByVolume = locTotals.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
         final maxLocVol = locsByVolume.isEmpty ? 1 : locsByVolume.first.value;
-        final hourCounts = <int, int>{};
-        for (final t in all) {
-          if (t.createdAt == null) continue;
-          final h = t.createdAt!.toLocal().hour;
-          hourCounts[h] = (hourCounts[h] ?? 0) + 1;
-        }
         final peakHours = (hourCounts.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value))).take(5).toList();
+              ..sort((a, b) => b.value.compareTo(a.value)))
+            .take(5)
+            .toList();
         final maxPeak = peakHours.isEmpty ? 1 : peakHours.first.value;
+
+        // Alias to match widget references below.
+        final requested = requestedCount;
+        final today = todayCount;
+        final cancelled = cancelledCount;
 
         final stats = [
           _StatCardData('Active Cars', active.length.toString(),
@@ -470,7 +482,7 @@ class _DashboardTab extends ConsumerWidget {
                     children: [for (final s in stats) _StatCard(data: s)],
                   ),
                   // Avg retrieval time inline
-                  if (timed.isNotEmpty) ...[
+                  if (timedCount > 0) ...[
                     const SizedBox(height: VSpace.x3),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -1399,7 +1411,7 @@ class _PersonRow extends StatelessWidget {
                   child: Switch(
                     value: isActive,
                     onChanged: (_) => onToggle(),
-                    activeColor: VColors.alertSuccess,
+                    activeThumbColor: VColors.alertSuccess,
                   ),
                 ),
               ],

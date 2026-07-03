@@ -54,6 +54,9 @@ enum LifecycleStatus {
     for (final s in LifecycleStatus.values) {
       if (s.wire == value) return s;
     }
+    // ponytail: assert instead of throw so unknown statuses degrade gracefully
+    // in prod but blow up loudly in debug.
+    assert(false, 'LifecycleStatus.fromWire: unknown wire value "$value" — update the enum');
     return waitingForDriver;
   }
 

@@ -236,3 +236,15 @@ final facilityOwnerLocationsProvider =
     FutureProvider.autoDispose<List<AdminLocation>>((ref) async {
   return ref.watch(apiClientProvider).fetchFacilityOwnerLocations();
 });
+
+/// Active (non-terminal) transactions at the facility owner's location.
+final facilityOwnerTransactionsProvider =
+    FutureProvider.autoDispose<List<Transaction>>((ref) async {
+  return ref.watch(apiClientProvider).fetchFacilityOwnerTransactions();
+});
+
+/// Full transaction history for the facility owner's location (newest 200).
+final facilityOwnerHistoryProvider =
+    FutureProvider.autoDispose<List<Transaction>>((ref) async {
+  return ref.watch(apiClientProvider).fetchFacilityOwnerTransactionHistory();
+});

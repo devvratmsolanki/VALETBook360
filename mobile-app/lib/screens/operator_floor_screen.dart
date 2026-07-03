@@ -1,9 +1,17 @@
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:qr_flutter/qr_flutter.dart';
 import '../models/driver.dart';
 import '../models/lifecycle_status.dart';
 import '../models/transaction.dart';
+import '../api/api_client.dart';
+import '../api/api_exception.dart';
 import '../state/clock.dart';
 import '../state/drivers_controller.dart';
 import '../state/floor_controller.dart';
@@ -27,8 +35,16 @@ import 'operator_create_screen.dart';
 /// status pill, and the next-action button(s) for its state. A "+ New car" FAB
 /// opens the create sheet. Realtime deltas animate cards in place via the
 /// AnimatedSwitcher keyed on `id:status`.
-class OperatorFloorScreen extends ConsumerWidget {
+class OperatorFloorScreen extends ConsumerStatefulWidget {
   const OperatorFloorScreen({super.key});
+
+  @override
+  ConsumerState<OperatorFloorScreen> createState() => _OperatorFloorScreenState();
+}
+
+class _OperatorFloorScreenState extends ConsumerState<OperatorFloorScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tab;
 
   /// The visible buckets, in floor order. Driver-held / terminal states don't
   /// surface their own group (assigned cars show under "Assigned" until handed
@@ -46,7 +62,20 @@ class OperatorFloorScreen extends ConsumerWidget {
   ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+    _tab.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final floor = ref.watch(floorControllerProvider);
     final user = ref.watch(authControllerProvider).user;
 
@@ -76,6 +105,15 @@ class OperatorFloorScreen extends ConsumerWidget {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Guest QR code',
+            constraints: const BoxConstraints(
+              minWidth: VTarget.minTouch,
+              minHeight: VTarget.minTouch,
+            ),
+            icon: Icon(Icons.qr_code_rounded, color: VColors.contentMuted),
+            onPressed: () => _showQr(context),
+          ),
           const ThemeToggleButton(),
           IconButton(
             tooltip: 'Refresh',
@@ -97,16 +135,38 @@ class OperatorFloorScreen extends ConsumerWidget {
           ),
           const SizedBox(width: VSpace.x2),
         ],
+        bottom: TabBar(
+          controller: _tab,
+          indicatorColor: VColors.brand400,
+          labelColor: VColors.contentStrong,
+          unselectedLabelColor: VColors.contentMuted,
+          labelStyle: VType.label,
+          tabs: const [
+            Tab(text: 'Active'),
+            Tab(text: 'Delivered'),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: VColors.brand500,
-        foregroundColor: VColors.contentOnAccent,
-        icon: const Icon(Icons.add_rounded),
-        label: Text('New car', style: VType.label.copyWith(
-            color: VColors.contentOnAccent)),
-        onPressed: () => _openCreate(context),
+      floatingActionButton: _tab.index == 0
+          ? FloatingActionButton.extended(
+              backgroundColor: VColors.brand500,
+              foregroundColor: VColors.contentOnAccent,
+              icon: const Icon(Icons.add_rounded),
+              label: Text('New car',
+                  style: VType.label.copyWith(color: VColors.contentOnAccent)),
+              onPressed: () => _openCreate(context),
+            )
+          : null,
+      body: SafeArea(
+        top: false,
+        child: TabBarView(
+          controller: _tab,
+          children: [
+            _body(context, ref, floor),
+            _OperatorDeliveredTab(client: ref.read(apiClientProvider)),
+          ],
+        ),
       ),
-      body: SafeArea(top: false, child: _body(context, ref, floor)),
     );
   }
 
@@ -115,6 +175,162 @@ class OperatorFloorScreen extends ConsumerWidget {
     if (plate != null && context.mounted) {
       _toast(context, 'Added · $plate', VColors.alertSuccess);
     }
+  }
+
+  /// Guest portal URL. Flutter web defaults to hash routing, so routes live under
+  /// /#/path. The port is omitted when 80/443 to produce clean URLs.
+  String _guestPortalUrl() {
+    final base = Uri.base;
+    final port = (base.port == 80 || base.port == 443) ? '' : ':${base.port}';
+    return '${base.scheme}://${base.host}$port/#/guest';
+  }
+
+  void _showQr(BuildContext context) {
+    final url = _guestPortalUrl();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: VColors.surface900,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(VRadius.xl)),
+          border: Border(top: BorderSide(color: VColors.surface700)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(VSpace.x6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40, height: 4,
+                  margin: const EdgeInsets.only(bottom: VSpace.x5),
+                  decoration: BoxDecoration(
+                    color: VColors.surface600,
+                    borderRadius: BorderRadius.circular(VRadius.full),
+                  ),
+                ),
+                Text('Guest Portal QR', style: VType.title.copyWith(color: VColors.contentStrong)),
+                const SizedBox(height: VSpace.x2),
+                Text('Show this to your guest — they scan to track their car.',
+                    style: VType.caption, textAlign: TextAlign.center),
+                const SizedBox(height: VSpace.x5),
+                Container(
+                  padding: const EdgeInsets.all(VSpace.x3),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(VRadius.md),
+                  ),
+                  child: QrImageView(
+                    data: url,
+                    version: QrVersions.auto,
+                    size: 220,
+                    eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
+                    dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Colors.black),
+                  ),
+                ),
+                const SizedBox(height: VSpace.x4),
+                Text(url, style: VType.caption, textAlign: TextAlign.center),
+                const SizedBox(height: VSpace.x2),
+                OutlinedButton.icon(
+                  onPressed: () => _downloadQrPdf(url),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: VColors.contentStrong,
+                    side: BorderSide(color: VColors.surface600),
+                    padding: const EdgeInsets.symmetric(horizontal: VSpace.x5, vertical: VSpace.x3),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(VRadius.md)),
+                  ),
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: Text('Download PDF (4 × 8 codes)', style: VType.label),
+                ),
+                const SizedBox(height: VSpace.x2),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Builds a PDF with 4 × 8 identical QR codes pointing at [url].
+  /// Drawn module-by-module so no image conversion step is needed.
+  Future<Uint8List> _buildQrPdfBytes(String url) async {
+    final qrImg = QrImage(QrCode.fromData(
+      data: url,
+      errorCorrectLevel: QrErrorCorrectLevel.M,
+    ));
+    final moduleCount = qrImg.moduleCount;
+
+    const cols = 4;
+    const rows = 8;
+    const pageMargin = 20.0;
+
+    final pageW = PdfPageFormat.a4.width - pageMargin * 2;
+    final pageH = PdfPageFormat.a4.height - pageMargin * 2;
+    final cellW = pageW / cols;
+    final cellH = pageH / rows;
+    final qrSize = min(cellW, cellH) * 0.80;
+
+    void paintQr(PdfGraphics canvas, PdfPoint size) {
+      final mod = size.x / moduleCount;
+      canvas.setFillColor(PdfColors.black);
+      for (int row = 0; row < moduleCount; row++) {
+        for (int col = 0; col < moduleCount; col++) {
+          if (qrImg.isDark(row, col)) {
+            final x = col * mod;
+            final y = size.y - (row + 1) * mod; // PDF origin is bottom-left
+            canvas
+              ..drawRect(x, y, mod, mod)
+              ..fillPath();
+          }
+        }
+      }
+    }
+
+    final doc = pw.Document();
+    doc.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(pageMargin),
+      build: (_) => pw.Column(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+        children: List.generate(
+          rows,
+          (r) => pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+            children: List.generate(
+              cols,
+              (_) => pw.SizedBox(
+                width: cellW,
+                height: cellH,
+                child: pw.Center(
+                  child: pw.CustomPaint(
+                    size: PdfPoint(qrSize, qrSize),
+                    painter: paintQr,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+
+    return doc.save();
+  }
+
+  void _downloadQrPdf(String url) async {
+    final bytes = await _buildQrPdfBytes(url);
+    final blob = web.Blob(
+      [bytes.toJS].toJS,
+      web.BlobPropertyBag(type: 'application/pdf'),
+    );
+    final dlUrl = web.URL.createObjectURL(blob);
+    final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
+    anchor.href = dlUrl;
+    anchor.download = 'guest-qr-codes.pdf';
+    anchor.click();
+    web.URL.revokeObjectURL(dlUrl);
   }
 
   Widget _body(BuildContext context, WidgetRef ref, FloorState floor) {
@@ -222,6 +438,37 @@ class OperatorFloorScreen extends ConsumerWidget {
     Transaction tx,
     OperatorAction action,
   ) async {
+    // Require explicit confirmation before permanently cancelling a booking.
+    if (action == OperatorAction.cancel) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: VColors.surface800,
+          title: Text('Cancel booking?',
+              style: VType.title.copyWith(color: VColors.contentStrong)),
+          content: Text(
+            'This will permanently cancel the booking for ${tx.carPlate}. '
+            'The car will be removed from the floor.',
+            style: VType.body,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child:
+                  Text('Keep', style: VType.label.copyWith(color: VColors.contentMuted)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text('Cancel booking',
+                  style: VType.label.copyWith(color: VColors.alertDanger)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      if (!context.mounted) return;
+    }
+
     String? driverId;
     if (action == OperatorAction.assign ||
         action == OperatorAction.assignPark) {
@@ -345,6 +592,16 @@ class _FloorCard extends ConsumerWidget {
                   label: tx.guestName!,
                   semanticLabel: 'Guest ${tx.guestName}',
                 ),
+              if (tx.guestPhone != null && tx.guestPhone!.isNotEmpty)
+                Builder(builder: (_) {
+                  final d = tx.guestPhone!.replaceAll(RegExp(r'[\s\-\+]'), '');
+                  final last4 = d.length >= 4 ? d.substring(d.length - 4) : d;
+                  return VMetaChip(
+                    icon: Icons.phone_outlined,
+                    label: '••••$last4',
+                    semanticLabel: 'Phone ending $last4',
+                  );
+                }),
               VMetaChip(
                 icon: Icons.schedule_rounded,
                 label: elapsed,
@@ -768,6 +1025,196 @@ class _DriverTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Delivered-cars history tab for the operator floor.
+/// Fetches the full company history and filters to delivered status only.
+class _OperatorDeliveredTab extends StatefulWidget {
+  const _OperatorDeliveredTab({required this.client});
+  final ApiClient client;
+
+  @override
+  State<_OperatorDeliveredTab> createState() => _OperatorDeliveredTabState();
+}
+
+class _OperatorDeliveredTabState extends State<_OperatorDeliveredTab>
+    with AutomaticKeepAliveClientMixin {
+  static const _kSize = 50;
+
+  final List<Transaction> _items = [];
+  int _page = 0;
+  bool _hasMore = true;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load({bool reset = false}) async {
+    if (_loading) return;
+    if (reset) {
+      _items.clear();
+      _page = 0;
+      _hasMore = true;
+      _error = null;
+    }
+    setState(() => _loading = true);
+    try {
+      final page = await widget.client.fetchTransactionHistory(page: _page, size: _kSize);
+      if (!mounted) return;
+      final delivered = page.where((t) => t.status == LifecycleStatus.delivered).toList();
+      setState(() {
+        _items.addAll(delivered);
+        _hasMore = page.length == _kSize;
+        _page++;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e is ApiException ? e.message : 'Could not load history.';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    if (_loading && _items.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null && _items.isEmpty) {
+      return Center(
+        child: VBanner(message: _error!, onRetry: () => _load(reset: true)),
+      );
+    }
+    if (_items.isEmpty) {
+      return const VEmptyState(
+        icon: Icons.check_circle_outline_rounded,
+        headline: 'No deliveries yet',
+        hint: 'Completed deliveries will appear here',
+      );
+    }
+    return RefreshIndicator(
+      color: VColors.brand400,
+      backgroundColor: VColors.surface800,
+      onRefresh: () => _load(reset: true),
+      child: ListView.separated(
+        padding: const EdgeInsets.all(VSpace.x4),
+        itemCount: _items.length + (_hasMore ? 1 : 0),
+        separatorBuilder: (_, __) => const SizedBox(height: VSpace.x3),
+        itemBuilder: (_, i) {
+          if (i == _items.length) {
+            return Center(
+              child: _loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(VSpace.x4),
+                      child: CircularProgressIndicator(),
+                    )
+                  : TextButton(
+                      onPressed: _load,
+                      child: const Text('Load more'),
+                    ),
+            );
+          }
+          return _DeliveredCard(tx: _items[i]);
+        },
+      ),
+    );
+  }
+}
+
+/// A compact delivered-car card for the history list.
+class _DeliveredCard extends StatelessWidget {
+  const _DeliveredCard({required this.tx});
+  final Transaction tx;
+
+  @override
+  Widget build(BuildContext context) {
+    final deliveredAt = tx.deliveredAt?.toLocal();
+    final timeLabel = deliveredAt == null
+        ? '—'
+        : '${deliveredAt.hour.toString().padLeft(2, '0')}:${deliveredAt.minute.toString().padLeft(2, '0')}  ·  '
+            '${_monthName(deliveredAt.month)} ${deliveredAt.day}';
+    return Container(
+      padding: const EdgeInsets.all(VSpace.x4),
+      decoration: BoxDecoration(
+        color: VColors.surface900,
+        borderRadius: BorderRadius.circular(VRadius.lg),
+        border: Border.all(color: VColors.surface700),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tx.carPlate,
+                    style: VType.monoLg.copyWith(color: VColors.contentStrong)),
+                if (tx.vehicleSubline.isNotEmpty) ...[
+                  const SizedBox(height: VSpace.x1),
+                  Text(tx.vehicleSubline,
+                      style: VType.caption,
+                      overflow: TextOverflow.ellipsis),
+                ],
+                const SizedBox(height: VSpace.x2),
+                Wrap(
+                  spacing: VSpace.x2,
+                  runSpacing: VSpace.x2,
+                  children: [
+                    if (tx.keyCode != null) VKeySlotChip(code: tx.keyCode!),
+                    if (tx.guestName != null)
+                      VMetaChip(
+                        icon: Icons.person_outline_rounded,
+                        label: tx.guestName!,
+                      ),
+                    if (tx.guestPhone != null && tx.guestPhone!.isNotEmpty)
+                      Builder(builder: (_) {
+                        final d = tx.guestPhone!.replaceAll(RegExp(r'[\s\-\+]'), '');
+                        final last4 = d.length >= 4 ? d.substring(d.length - 4) : d;
+                        return VMetaChip(icon: Icons.phone_outlined, label: '••••$last4');
+                      }),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: VSpace.x3),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: VSpace.x2, vertical: 3),
+                decoration: BoxDecoration(
+                  color: VColors.statusDone.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(VRadius.full),
+                ),
+                child: Text('Delivered',
+                    style: VType.caption.copyWith(
+                        color: VColors.statusDone,
+                        fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: VSpace.x2),
+              Text(timeLabel, style: VType.caption),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _monthName(int m) => const [
+        '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ][m];
 }
 
 /// Skeleton list while the floor loads.

@@ -3,11 +3,17 @@ package com.valet.auth;
 import com.valet.auth.config.JwtProperties;
 import com.valet.auth.domain.Role;
 import com.valet.auth.domain.User;
+import com.valet.auth.repository.LocationRepository;
 import com.valet.auth.security.AuthPrincipal;
 import com.valet.auth.security.JwtService;
 import io.jsonwebtoken.JwtException;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+import java.util.List;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.UUID;
 
@@ -24,7 +30,10 @@ class JwtServiceTest {
         props.setSecret(secret);
         props.setIssuer("valet-auth-test");
         props.setAccessTtlSeconds(900);
-        return new JwtService(props);
+        LocationRepository locationRepo = mock(LocationRepository.class);
+        when(locationRepo.findByFacilityOwnerIdOrderByNameAsc(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of());
+        return new JwtService(props, locationRepo);
     }
 
     private User sampleUser(UUID companyId, UUID locationId) {

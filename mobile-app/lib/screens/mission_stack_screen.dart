@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../api/api_client.dart';
+import '../api/api_exception.dart';
 import '../models/assignment.dart';
 import '../models/lifecycle_status.dart';
+import '../models/transaction.dart';
 import '../state/missions_controller.dart';
 import '../state/providers.dart';
 import '../theme/motion.dart';
@@ -14,6 +17,7 @@ import '../widgets/app_logo.dart';
 import '../widgets/mission_card.dart';
 import '../widgets/success_burst.dart';
 import '../widgets/theme_toggle_button.dart';
+import '../widgets/v_chips.dart';
 import '../widgets/v_states.dart';
 
 /// 7.5 Driver — Mission Stack (home). Active mission full-bleed with the
@@ -26,8 +30,22 @@ class MissionStackScreen extends ConsumerStatefulWidget {
   ConsumerState<MissionStackScreen> createState() => _MissionStackScreenState();
 }
 
-class _MissionStackScreenState extends ConsumerState<MissionStackScreen> {
+class _MissionStackScreenState extends ConsumerState<MissionStackScreen>
+    with SingleTickerProviderStateMixin {
   bool _showBurst = false;
+  late final TabController _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
 
   Future<void> _advance(Assignment mission, DriverAction action) async {
     final result =
@@ -131,18 +149,35 @@ class _MissionStackScreenState extends ConsumerState<MissionStackScreen> {
           ),
           const SizedBox(width: VSpace.x2),
         ],
+        bottom: TabBar(
+          controller: _tab,
+          indicatorColor: VColors.brand400,
+          labelColor: VColors.contentStrong,
+          unselectedLabelColor: VColors.contentMuted,
+          labelStyle: VType.label,
+          tabs: const [
+            Tab(text: 'Active'),
+            Tab(text: 'Delivered'),
+          ],
+        ),
       ),
       body: SafeArea(
         top: false,
-        child: Stack(
+        child: TabBarView(
+          controller: _tab,
           children: [
-            _body(missions),
-            if (_showBurst)
-              Positioned.fill(
-                child: SuccessBurst(
-                  onComplete: () => setState(() => _showBurst = false),
-                ),
-              ),
+            Stack(
+              children: [
+                _body(missions),
+                if (_showBurst)
+                  Positioned.fill(
+                    child: SuccessBurst(
+                      onComplete: () => setState(() => _showBurst = false),
+                    ),
+                  ),
+              ],
+            ),
+            _DriverDeliveredTab(client: ref.read(apiClientProvider)),
           ],
         ),
       ),
@@ -325,6 +360,180 @@ class _UpNextPeek extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Driver's delivered-car history tab.
+/// Fetches from GET /api/driver/history (delivered cars only, newest first).
+class _DriverDeliveredTab extends StatefulWidget {
+  const _DriverDeliveredTab({required this.client});
+  final ApiClient client;
+
+  @override
+  State<_DriverDeliveredTab> createState() => _DriverDeliveredTabState();
+}
+
+class _DriverDeliveredTabState extends State<_DriverDeliveredTab>
+    with AutomaticKeepAliveClientMixin {
+  static const _kSize = 50;
+
+  final List<Transaction> _items = [];
+  int _page = 0;
+  bool _hasMore = true;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load({bool reset = false}) async {
+    if (_loading) return;
+    if (reset) {
+      _items.clear();
+      _page = 0;
+      _hasMore = true;
+      _error = null;
+    }
+    setState(() => _loading = true);
+    try {
+      final page = await widget.client.fetchDriverHistory(page: _page, size: _kSize);
+      if (!mounted) return;
+      setState(() {
+        _items.addAll(page);
+        _hasMore = page.length == _kSize;
+        _page++;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e is ApiException ? e.message : 'Could not load history.';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    if (_loading && _items.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null && _items.isEmpty) {
+      return Center(
+        child: VBanner(message: _error!, onRetry: () => _load(reset: true)),
+      );
+    }
+    if (_items.isEmpty) {
+      return const VEmptyState(
+        icon: Icons.check_circle_outline_rounded,
+        headline: 'No deliveries yet',
+        hint: 'Cars you deliver will appear here',
+      );
+    }
+    return RefreshIndicator(
+      color: VColors.brand400,
+      backgroundColor: VColors.surface800,
+      onRefresh: () => _load(reset: true),
+      child: ListView.separated(
+        padding: const EdgeInsets.all(VSpace.x4),
+        itemCount: _items.length + (_hasMore ? 1 : 0),
+        separatorBuilder: (_, __) => const SizedBox(height: VSpace.x3),
+        itemBuilder: (_, i) {
+          if (i == _items.length) {
+            return Center(
+              child: _loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(VSpace.x4),
+                      child: CircularProgressIndicator(),
+                    )
+                  : TextButton(
+                      onPressed: _load,
+                      child: const Text('Load more'),
+                    ),
+            );
+          }
+          return _DriverDeliveredCard(tx: _items[i]);
+        },
+      ),
+    );
+  }
+}
+
+class _DriverDeliveredCard extends StatelessWidget {
+  const _DriverDeliveredCard({required this.tx});
+  final Transaction tx;
+
+  @override
+  Widget build(BuildContext context) {
+    final dt = tx.deliveredAt?.toLocal();
+    final timeLabel = dt == null
+        ? '—'
+        : '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}  ·  '
+            '${_month(dt.month)} ${dt.day}';
+    return Container(
+      padding: const EdgeInsets.all(VSpace.x4),
+      decoration: BoxDecoration(
+        color: VColors.surface800,
+        borderRadius: BorderRadius.circular(VRadius.xl),
+        border: Border.all(color: VColors.surface700, width: 1),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tx.carPlate,
+                    style: VType.monoLg.copyWith(
+                        color: VColors.contentStrong)),
+                if (tx.vehicleSubline.isNotEmpty) ...[
+                  const SizedBox(height: VSpace.x1),
+                  Text(tx.vehicleSubline,
+                      style: VType.caption,
+                      overflow: TextOverflow.ellipsis),
+                ],
+                const SizedBox(height: VSpace.x2),
+                Wrap(
+                  spacing: VSpace.x2,
+                  runSpacing: VSpace.x2,
+                  children: [
+                    if (tx.keyCode != null) VKeySlotChip(code: tx.keyCode!),
+                    if (tx.guestName != null)
+                      VMetaChip(
+                          icon: Icons.person_outline_rounded,
+                          label: tx.guestName!),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: VSpace.x3),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Icon(Icons.check_circle_rounded,
+                  color: VColors.statusDone, size: 20),
+              const SizedBox(height: VSpace.x2),
+              Text(timeLabel,
+                  style: VType.caption,
+                  textAlign: TextAlign.right),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _month(int m) => const [
+        '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ][m];
 }
 
 /// Skeleton mission card (doc §7.5 loading state).

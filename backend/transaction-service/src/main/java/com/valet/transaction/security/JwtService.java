@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -67,7 +68,14 @@ public class JwtService {
             throw new JwtException("Missing role claim");
         }
 
-        return new AuthPrincipal(userId, role, companyId, locationId, email, name);
+        // Facility owner multi-location IDs (absent for all other roles).
+        @SuppressWarnings("unchecked")
+        List<String> rawIds = claims.get("locationIds", List.class);
+        List<UUID> locationIds = rawIds != null
+                ? rawIds.stream().map(UUID::fromString).toList()
+                : List.of();
+
+        return new AuthPrincipal(userId, role, companyId, locationId, email, name, locationIds);
     }
 
     private static UUID optionalUuid(Claims claims, String key) {

@@ -79,6 +79,7 @@ class ApiConfig {
   static const String driversPath = '/drivers';
 
   static const String assignmentsPath = '/api/driver/assignments';
+  static const String driverHistoryPath = '/api/driver/history';
 
   /// Lifecycle transition endpoints, keyed by the action verb.
   ///   driver_assigned → en-route, en_route → arrived, arrived → delivered
@@ -151,4 +152,11 @@ class ApiConfig {
 
   // Facility owner self-service.
   static const String facilityOwnerLocationsPath = '/api/facility-owner/locations';
+  static const String facilityOwnerTransactionsPath = '/api/facility-owner/transactions';
+  static const String facilityOwnerHistoryPath = '/api/facility-owner/transactions/history';
+
+  // Public guest portal (no auth required).
+  static const String guestLookupPath = '/api/guest/lookup';
+  static const String guestRequestPath = '/api/guest/request';
+  static const String guestStatusPath = '/api/guest/status';
 }
