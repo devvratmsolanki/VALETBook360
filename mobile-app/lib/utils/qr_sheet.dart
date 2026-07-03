@@ -24,10 +24,14 @@ String guestPortalUrl() {
 /// [label] appears as the subtitle (location or operator name) on the sheet.
 void showQrSheet(BuildContext context, String label) {
   final url = guestPortalUrl();
+  // Single normalization point for every caller (driver displayName, facility
+  // owner / location names): empty or whitespace-only falls back so no blank
+  // label or `guest-qr-.pdf` filename can leak through downstream.
+  final safe = label.trim().isEmpty ? 'Guest Portal' : label.trim();
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
-    builder: (_) => _QrSheetContent(url: url, label: label),
+    builder: (_) => _QrSheetContent(url: url, label: safe),
   );
 }
 
@@ -91,7 +95,9 @@ Future<Uint8List> buildQrPdfBytes(String url, String label) async {
                     ),
                     pw.SizedBox(height: 3),
                     pw.Text(
-                      label,
+                      label.length > 25 ? '${label.substring(0, 24)}…' : label,
+                      maxLines: 1,
+                      overflow: pw.TextOverflow.clip,
                       style: pw.TextStyle(
                         fontSize: 7,
                         color: PdfColors.grey700,
@@ -111,7 +117,7 @@ Future<Uint8List> buildQrPdfBytes(String url, String label) async {
 }
 
 /// Triggers a browser download of the QR PDF.
-void downloadQrPdf(String url, String label) async {
+Future<void> downloadQrPdf(String url, String label) async {
   final bytes = await buildQrPdfBytes(url, label);
   final blob = web.Blob(
     [bytes.toJS].toJS,
@@ -120,8 +126,9 @@ void downloadQrPdf(String url, String label) async {
   final dlUrl = web.URL.createObjectURL(blob);
   final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
   anchor.href = dlUrl;
-  // Sanitise label for use in filename.
-  final safeName = label.replaceAll(RegExp(r'[^\w\s-]'), '').trim().replaceAll(' ', '-').toLowerCase();
+  // Sanitise label for use in filename (fall back if it strips to nothing).
+  final stripped = label.replaceAll(RegExp(r'[^\w\s-]'), '').trim().replaceAll(' ', '-').toLowerCase();
+  final safeName = stripped.isEmpty ? 'location' : stripped;
   anchor.download = 'guest-qr-$safeName.pdf';
   anchor.click();
   web.URL.revokeObjectURL(dlUrl);
@@ -182,7 +189,18 @@ class _QrSheetContent extends StatelessWidget {
               Text(url, style: VType.caption, textAlign: TextAlign.center),
               const SizedBox(height: VSpace.x2),
               OutlinedButton.icon(
-                onPressed: () => downloadQrPdf(url, label),
+                onPressed: () async {
+                  try {
+                    await downloadQrPdf(url, label);
+                  } catch (_) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Could not generate the PDF.')),
+                      );
+                    }
+                  }
+                },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: VColors.contentStrong,
                   side: BorderSide(color: VColors.surface600),

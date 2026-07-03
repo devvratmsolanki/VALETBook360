@@ -906,15 +906,22 @@ class _OperatorDeliveredTabState extends State<_OperatorDeliveredTab>
     }
     setState(() => _loading = true);
     try {
-      final page = await widget.client.fetchTransactionHistory(page: _page, size: _kSize);
-      if (!mounted) return;
-      final delivered = page.where((t) => t.status == LifecycleStatus.delivered).toList();
-      setState(() {
+      // The company history endpoint returns all statuses; we surface only
+      // delivered. Skip pages with zero delivered rows so "Load more" always
+      // makes visible progress instead of appearing to do nothing.
+      // ponytail: cap at 20 pages (~1000 rows) per call so a long all-active
+      // tail can't spin; the user taps again to keep going.
+      var added = 0;
+      for (var i = 0; i < 20 && _hasMore && added == 0; i++) {
+        final page = await widget.client.fetchTransactionHistory(page: _page, size: _kSize);
+        if (!mounted) return;
+        final delivered = page.where((t) => t.status == LifecycleStatus.delivered).toList();
         _items.addAll(delivered);
+        added += delivered.length;
         _hasMore = page.length == _kSize;
         _page++;
-        _loading = false;
-      });
+      }
+      setState(() => _loading = false);
     } catch (e) {
       if (!mounted) return;
       setState(() {

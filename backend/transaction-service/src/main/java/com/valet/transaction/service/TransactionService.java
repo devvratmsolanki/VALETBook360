@@ -168,8 +168,12 @@ public class TransactionService {
      */
     @Transactional(readOnly = true)
     public List<ValetTransaction> getCompanyHistory(UUID companyId, int page, int size) {
+        // Clamp here (the single point where PageRequest is built) so a hostile or
+        // buggy page/size can't crash PageRequest.of with IllegalArgumentException.
+        int p = Math.max(page, 0);
+        int s = Math.min(Math.max(size, 1), 200);
         return repository.findByCompanyIdOrderByCreatedAtDesc(
-                companyId, PageRequest.of(page, Math.min(size, 200)));
+                companyId, PageRequest.of(p, s));
     }
 
     /** Guest lookup: find active transaction by plate + last 4 of phone. Throws NOT_FOUND if unmatched. */
@@ -195,8 +199,10 @@ public class TransactionService {
     /** A driver's delivery history: cars they retrieved, newest-delivered-first, paginated. */
     @Transactional(readOnly = true)
     public List<ValetTransaction> getDriverHistory(UUID driverId, int page, int size) {
+        int p = Math.max(page, 0);
+        int s = Math.min(Math.max(size, 1), 100);
         return repository.findByRetrievedByDriverIdAndStatusInOrderByDeliveredAtDesc(
-                driverId, List.of(ValetStatus.DELIVERED), PageRequest.of(page, Math.min(size, 100)));
+                driverId, List.of(ValetStatus.DELIVERED), PageRequest.of(p, s));
     }
 
     /** Guest request: transition parked/key_in → requested. Idempotent if already in requested+. */
